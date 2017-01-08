@@ -9,11 +9,11 @@ namespace Synchronizer.ApplicationLogic
     [Serializable()]
     public class FileDirectory
     {
-        public string DirectoryPath { get; set; }
+        public string Path { get; set; }
 
-        public FileDirectory(string directory)
+        public FileDirectory(string path)
         {
-            this.DirectoryPath = directory;
+            this.Path = path;
         }
 
         protected FileDirectory()
@@ -23,7 +23,7 @@ namespace Synchronizer.ApplicationLogic
 
         public override string ToString()
         {
-            return this.DirectoryPath;
+            return this.Path;
         }
     }
 }

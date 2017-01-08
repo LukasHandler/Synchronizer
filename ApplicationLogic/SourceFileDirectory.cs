@@ -25,7 +25,7 @@ namespace Synchronizer.ApplicationLogic
 
         public override string ToString()
         {
-            return this.DirectoryPath;
+            return this.Path;
         }
     }
 }

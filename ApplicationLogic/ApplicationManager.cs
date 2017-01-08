@@ -81,6 +81,11 @@ namespace Synchronizer.ApplicationLogic
             return sourceDirectories[sourceId].TargetDirectories.Select(p => p.ToString()).ToList();
         }
 
+        public void AddTarget(int sourceId, string path)
+        {
+            this.sourceDirectories[sourceId].TargetDirectories.Add(new FileDirectory(path));
+        }
+
         public List<string> GetExceptions(int sourceId)
         {
             return sourceDirectories[sourceId].Exceptions.Select(p => p.ToString()).ToList();

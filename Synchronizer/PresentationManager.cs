@@ -19,31 +19,45 @@ namespace Synchronizer.PresentationLogic
 
         private enum Menu
         {
-            F3,     // Sources
-            F4,     // Targets
-            F5,     // Exceptions
-            F6,     // Jobs
-            F7,     // Logs
-            F8,     // Settings
-            F9      // Help
+            Sources,
+            Targets,
+            Exceptions,
+            Jobs,
+            Logs,
+            Settings,
+            Help
         }
 
-        private Dictionary<Menu, string> menus;
+        private enum IdOperation
+        {
+            Delete,
+            Targets,
+            Exceptions
+        }
+
+        private enum PathOperation
+        {
+            Source,
+            Target,
+            Exception
+        }
+
+        private Dictionary<string, Menu> menus;
 
         private Menu currentMenu;
 
-        int currentSourceId;
+        private int currentSourceId;
 
         public PresentationManager()
         {
-            this.menus = new Dictionary<Menu, string>();
-            this.menus.Add(Menu.F3, "Sources");
-            this.menus.Add(Menu.F4, "Tragets");
-            this.menus.Add(Menu.F5, "Exceptions");
-            this.menus.Add(Menu.F6, "Jobs");
-            this.menus.Add(Menu.F7, "Logs");
-            this.menus.Add(Menu.F8, "Settings");
-            this.menus.Add(Menu.F9, "Help");
+            this.menus = new Dictionary<string, Menu>();
+            this.menus.Add("F3", Menu.Sources);
+            this.menus.Add("F4", Menu.Targets);
+            this.menus.Add("F5", Menu.Exceptions);
+            this.menus.Add("F6", Menu.Jobs);
+            this.menus.Add("F7", Menu.Logs);
+            this.menus.Add("F8", Menu.Help);
+            this.menus.Add("F9", Menu.Settings);
 
             this.Logs = new ConcurrentBag<string>();
             this.applicationManager = new ApplicationManager();
@@ -53,7 +67,7 @@ namespace Synchronizer.PresentationLogic
         public void Start()
         {
             ConsoleKey pressedKey;
-            ChangeMenu(Menu.F3);
+            ChangeMenu(Menu.Sources);
             PrintSources();
 
             do
@@ -66,14 +80,14 @@ namespace Synchronizer.PresentationLogic
                 switch (pressedKey)
                 {
                     case ConsoleKey.F3:
-                        this.ChangeMenu(Menu.F3);
+                        this.ChangeMenu(Menu.Sources);
                         PrintSources();
                         break;
                     case ConsoleKey.F4:
-                        CanPrintTargets();
+                        PrintTargets();
                         break;
                     case ConsoleKey.F5:
-                        CanPrintExceptions();
+                        PrintExceptions();
                         break;
                     case ConsoleKey.F6:
                         PrintJobs();
@@ -90,23 +104,28 @@ namespace Synchronizer.PresentationLogic
                     case ConsoleKey.A:
                         switch (currentMenu)
                         {
-                            case Menu.F3:
+                            case Menu.Sources:
                                 AddSource();
                                 break;
-                            case Menu.F4:
+                            case Menu.Targets:
+                                AddTarget();
                                 break;
-                            case Menu.F5:
+                            case Menu.Exceptions:
+                                AddException();
                                 break;
                         }
                         break;
                     case ConsoleKey.D:
                         switch (currentMenu)
                         {
-                            case Menu.F3:
+                            case Menu.Sources:
+                                DeleteSource();
                                 break;
-                            case Menu.F4:
+                            case Menu.Targets:
+                                DeleteTarget();
                                 break;
-                            case Menu.F5:
+                            case Menu.Exceptions:
+                                DeleteException();
                                 break;
                         }
                         break;
@@ -117,9 +136,12 @@ namespace Synchronizer.PresentationLogic
             applicationManager.SaveSettings();
         }
 
-        private void ChangeMenu(Menu newMenu)
+        private void ChangeMenu(Menu? newMenu = null)
         {
-            this.currentMenu = newMenu;
+            if (newMenu != null)
+            {
+                this.currentMenu = newMenu.Value;
+            }
 
             Console.ForegroundColor = ConsoleColor.DarkCyan;
             string separator = "_________________________";
@@ -131,13 +153,24 @@ namespace Synchronizer.PresentationLogic
                 Console.WriteLine(menu.Key.ToString() + " " + menu.Value);
             }
 
-            if (currentMenu == Menu.F3 || currentMenu == Menu.F4 || currentMenu == Menu.F5)
+            if (currentMenu == Menu.Sources || currentMenu == Menu.Targets || currentMenu == Menu.Exceptions)
             {
                 Console.WriteLine("A  Add");
                 Console.WriteLine("D  Delete");
             }
 
-            Console.WriteLine("Current Menu: " + this.currentMenu.ToString() + " " + this.menus[this.currentMenu]);
+            Console.WriteLine("Current Menu: {0} {1}",
+                this.menus.First(p => p.Value.ToString() == this.currentMenu.ToString()).Key,
+                this.currentMenu.ToString());
+
+            if (currentMenu == Menu.Targets || currentMenu == Menu.Exceptions)
+            {
+                var currentSource = applicationManager.GetSources()[currentSourceId];
+                Console.WriteLine("{0} for source {1}",
+                    currentMenu.ToString(),
+                    currentSource);
+            }
+
             Console.WriteLine(separator);
             Console.ForegroundColor = ConsoleColor.Gray;
         }
@@ -145,10 +178,7 @@ namespace Synchronizer.PresentationLogic
         private void PrintSources()
         {
             var sources = applicationManager.GetSources();
-            foreach (var source in sources)
-            {
-                Console.WriteLine(source);
-            }
+            PrintListWithIndex(sources);
         }
 
         private void AddSource()
@@ -156,9 +186,10 @@ namespace Synchronizer.PresentationLogic
             string newDirectoryPath;
             var sources = applicationManager.GetSources();
 
-            if (GetPathInput(out newDirectoryPath, sources))
+            if (GetPathInput(out newDirectoryPath, sources, PathOperation.Source))
             {
                 applicationManager.AddSource(newDirectoryPath);
+                this.ChangeMenu();
                 PrintSources();
             }
             else
@@ -169,17 +200,50 @@ namespace Synchronizer.PresentationLogic
 
         private void DeleteSource()
         {
-
+            var sources = applicationManager.GetSources();
+            if (sources == null || sources.Count == 0)
+            {
+                Console.WriteLine("Can't delete source because there are no sources.");
+            }
+            else
+            {
+                int id;
+                if (GetIdInputFromCollection(out id, sources, IdOperation.Delete))
+                {
+                    applicationManager.DeleteSource(id);
+                    this.ChangeMenu(Menu.Sources);
+                    this.PrintSources();
+                }
+                else
+                {
+                    Console.WriteLine("No id entered.");
+                }
+            }
         }
 
-        private bool GetIdInputFromCollection(out int id, List<string> collection)
+        private bool GetIdInputFromCollection(out int id, List<string> collection, IdOperation operation)
         {
             bool isValid = false;
             id = 0;
 
             do
             {
-                Console.Write("Enter source id (exit to cancel): ");
+                string information = string.Empty;
+
+                switch (operation)
+                {
+                    case IdOperation.Delete:
+                        information = " to delete";
+                        break;
+                    case IdOperation.Targets:
+                        information = " for targets";
+                        break;
+                    case IdOperation.Exceptions:
+                        information = " for sources";
+                        break;
+                }
+
+                Console.Write("Enter source id {0} (exit to cancel): ", information);
                 string input = Console.ReadLine().Trim();
 
                 if (input == "exit")
@@ -203,34 +267,45 @@ namespace Synchronizer.PresentationLogic
             return true;
         }
 
-        private void CanPrintTargets()
+        private void PrintTargets()
         {
             var sources = applicationManager.GetSources();
             if (sources.Count() == 0)
             {
                 Console.WriteLine("Can't open targets because there are no sources.");
-                this.ChangeMenu(Menu.F3);
+                this.ChangeMenu(Menu.Sources);
             }
             else
             {
                 int sourceId;
-                if (this.GetIdInputFromCollection(out sourceId, sources))
+                if (this.GetIdInputFromCollection(out sourceId, sources, IdOperation.Targets))
                 {
-                    Console.WriteLine("Targets for source: " + sourceId + " " + sources[sourceId]);
+                    this.currentSourceId = sourceId;
+                    this.ChangeMenu(Menu.Targets);
                     this.PrintListWithIndex(applicationManager.GetTargets(sourceId));
-                    this.ChangeMenu(Menu.F4);
                 }
                 else
                 {
-                    Console.WriteLine("No id entered");
-                    this.ChangeMenu(Menu.F3);
+                    Console.WriteLine("No id entered.");
+                    this.ChangeMenu(Menu.Sources);
                 }
             }
         }
 
         private void AddTarget()
         {
+            string newDirectoryPath = null;
 
+            if (GetPathInput(out newDirectoryPath, null, PathOperation.Target))
+            {
+                applicationManager.AddTarget(currentSourceId, newDirectoryPath);
+                this.ChangeMenu();
+                this.PrintListWithIndex(applicationManager.GetTargets(this.currentSourceId));
+            }
+            else
+            {
+                Console.WriteLine("No path entered");
+            }
         }
 
         private void DeleteTarget()
@@ -238,27 +313,27 @@ namespace Synchronizer.PresentationLogic
 
         }
 
-        private void CanPrintExceptions()
+        private void PrintExceptions()
         {
             var sources = applicationManager.GetSources();
             if (sources.Count() == 0)
             {
                 Console.WriteLine("Can't open exceptions because there are no sources");
-                this.ChangeMenu(Menu.F3);
+                this.ChangeMenu(Menu.Sources);
             }
             else
             {
                 int sourceId;
-                if (this.GetIdInputFromCollection(out sourceId, sources))
+                if (this.GetIdInputFromCollection(out sourceId, sources, IdOperation.Exceptions))
                 {
-                    Console.WriteLine("Exceptions for source: " + sourceId + " " + sources[sourceId]);
+                    this.currentSourceId = sourceId;
+                    this.ChangeMenu(Menu.Exceptions);
                     this.PrintListWithIndex(applicationManager.GetExceptions(sourceId));
-                    this.ChangeMenu(Menu.F5);
                 }
                 else
                 {
                     Console.WriteLine("No id entered");
-                    this.ChangeMenu(Menu.F3);
+                    this.ChangeMenu(Menu.Sources);
                 }
 
             }
@@ -295,13 +370,20 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintListWithIndex(List<string> values)
         {
-            for (int i = 0; i < values.Count(); i++)
+            if (values == null || values.Count == 0)
             {
-                Console.WriteLine(i + " " + values[i]);
+                Console.WriteLine("No entries");
+            }
+            else
+            {
+                for (int i = 0; i < values.Count(); i++)
+                {
+                    Console.WriteLine(i + " " + values[i]);
+                }
             }
         }
 
-        private bool GetPathInput(out string resultPath, List<string> existingPaths)
+        private bool GetPathInput(out string resultPath, List<string> existingPaths, PathOperation operation)
         {
             resultPath = string.Empty;
             string path;
@@ -309,7 +391,24 @@ namespace Synchronizer.PresentationLogic
 
             do
             {
-                Console.Write("Enter path: ");
+                string information = string.Empty;
+
+                switch (operation)
+                {
+                    case PathOperation.Source:
+                        information = "sources";
+                        break;
+                    case PathOperation.Target:
+                        information = "targets";
+                        break;
+                    case PathOperation.Exception:
+                        information = "exceptions";
+                        break;
+                    default:
+                        break;
+                }
+
+                Console.Write("Enter path for new {0} (\"exit\" to cancel): ", information);
                 path = Console.ReadLine().Replace('/', '\\').Trim().TrimEnd('\\').ToLower();
 
                 if (path == "exit")
@@ -321,7 +420,7 @@ namespace Synchronizer.PresentationLogic
                 {
                     Console.WriteLine("Error. Not a valid path.");
                 }
-                else if (existingPaths.Any(p => Path.GetFullPath(p) == Path.GetFullPath(path)))
+                else if (existingPaths != null && existingPaths.Any(p => Path.GetFullPath(p) == Path.GetFullPath(path)))
                 {
                     Console.WriteLine("Error. This path already exists");
                 }
