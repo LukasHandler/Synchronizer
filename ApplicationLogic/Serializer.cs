@@ -65,5 +65,20 @@ namespace Synchronizer.ApplicationLogic
             }
             return objectOut;
         }
+
+        public static T CopyObject<T>(T objectToCopy)
+        {
+            XmlSerializer serializer = new XmlSerializer(objectToCopy.GetType());
+            T result;
+
+            using (MemoryStream stream = new MemoryStream())
+            {
+                serializer.Serialize(stream, objectToCopy);
+                stream.Position = 0;
+                result = (T)serializer.Deserialize(stream);
+            }
+
+            return result;
+        }
     }
 }

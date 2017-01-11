@@ -40,6 +40,11 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
+        public string ValidateData()
+        {
+            return PathHelper.IsValid(this.sourceDirectories);
+        }
+
         public void SaveSettings()
         {
             try
@@ -66,9 +71,11 @@ namespace Synchronizer.ApplicationLogic
             return sourceDirectories.Select(p => p.ToString()).ToList();
         }
 
-        public void AddSource(string path)
+        public string AddSource(string path)
         {
-            this.sourceDirectories.Add(new SourceFileDirectory(path));
+            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            newDirectories.Add(new SourceFileDirectory(path));
+            return this.isValid(newDirectories);
         }
 
         public void DeleteSource(int sourceId)
@@ -78,17 +85,38 @@ namespace Synchronizer.ApplicationLogic
 
         public List<string> GetTargets(int sourceId)
         {
-            return sourceDirectories[sourceId].TargetDirectories.Select(p => p.ToString()).ToList();
+            return sourceDirectories[sourceId].Targets.Select(p => p.ToString()).ToList();
         }
 
-        public void AddTarget(int sourceId, string path)
+        public string AddTarget(int sourceId, string path)
         {
-            this.sourceDirectories[sourceId].TargetDirectories.Add(new FileDirectory(path));
+            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            newDirectories[sourceId].Targets.Add(new FileDirectory(path));
+            return this.isValid(newDirectories);
+        }
+
+        public void DeleteTarget(int sourceId, int targetId)
+        {
+            this.sourceDirectories[sourceId].Targets.RemoveAt(targetId);
         }
 
         public List<string> GetExceptions(int sourceId)
         {
             return sourceDirectories[sourceId].Exceptions.Select(p => p.ToString()).ToList();
+        }
+
+        public string AddException(int sourceId, string path)
+        {
+            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            newDirectories[sourceId].Exceptions.Add(new FileDirectory(path));
+            return this.isValid(newDirectories);
+        }
+
+        public string DeleteException(int sourceId, int exceptionId)
+        {
+            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            newDirectories[sourceId].Exceptions.RemoveAt(exceptionId);
+            return this.isValid(newDirectories);
         }
 
         public List<string> GetJobs()
@@ -101,14 +129,54 @@ namespace Synchronizer.ApplicationLogic
             return this.logs;
         }
 
-        public string GetSettings()
+        public uint GetBlockCompareMinFileSize()
         {
-            return this.settings.ToString();
+            return this.settings.BlockCompareMinFileSize;
+        }
+
+        public void SetBlockCompareMinFileSize(uint value)
+        {
+            this.settings.BlockCompareMinFileSize = value;
+        }
+
+        public uint GetBlockCompareBlockSize()
+        {
+            return this.settings.BlockCompareBlockSize;
+        }
+
+        public void SetBlockCompareBlockSize(uint value)
+        {
+            this.settings.BlockCompareBlockSize = value;
+        }
+
+        public bool GetParallelSync()
+        {
+            return this.settings.ParallelSync;
+        }
+
+        public void SetParallelSync(bool value)
+        {
+            this.settings.ParallelSync = value;
         }
 
         private void Log(string message)
         {
             this.logs.Add(DateTime.Now.ToString("dd.MM.yyyy-HH:mm:ss:FF") + " " + message);
+        }
+
+        private string isValid(List<SourceFileDirectory> newDirectories)
+        {
+            string errorMessage = PathHelper.IsValid(newDirectories);
+
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                return errorMessage;
+            }
+            else
+            {
+                this.sourceDirectories = newDirectories;
+                return null;
+            }
         }
     }
 }

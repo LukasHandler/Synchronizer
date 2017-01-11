@@ -22,7 +22,7 @@ namespace Synchronizer.ApplicationLogic
         /// <value>
         /// The minimum size of a file when the block comparison gets used.
         /// </value>
-        public int BlockCompareMinFileSize { get; set; }
+        public uint BlockCompareMinFileSize { get; set; }
 
         /// <summary>
         /// Gets or sets the size of the block compare block.
@@ -30,7 +30,7 @@ namespace Synchronizer.ApplicationLogic
         /// <value>
         /// The size of the block compare block.
         /// </value>
-        public int BlockCompareBlockSize { get; set; }
+        public uint BlockCompareBlockSize { get; set; }
 
         public bool ParallelSync { get; set; }
 

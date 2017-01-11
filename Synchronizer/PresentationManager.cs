@@ -30,9 +30,11 @@ namespace Synchronizer.PresentationLogic
 
         private enum IdOperation
         {
-            Delete,
-            Targets,
-            Exceptions
+            DeleteSource,
+            DeleteTarget,
+            DeleteException,
+            GetTargets,
+            GetExceptions
         }
 
         private enum PathOperation
@@ -46,7 +48,7 @@ namespace Synchronizer.PresentationLogic
 
         private Menu currentMenu;
 
-        private int currentSourceId;
+        private int? currentSourceId;
 
         public PresentationManager()
         {
@@ -56,8 +58,8 @@ namespace Synchronizer.PresentationLogic
             this.menus.Add("F5", Menu.Exceptions);
             this.menus.Add("F6", Menu.Jobs);
             this.menus.Add("F7", Menu.Logs);
-            this.menus.Add("F8", Menu.Help);
-            this.menus.Add("F9", Menu.Settings);
+            this.menus.Add("F8", Menu.Settings);
+            this.menus.Add("F9", Menu.Help);
 
             this.Logs = new ConcurrentBag<string>();
             this.applicationManager = new ApplicationManager();
@@ -66,81 +68,94 @@ namespace Synchronizer.PresentationLogic
 
         public void Start()
         {
-            ConsoleKey pressedKey;
-            ChangeMenu(Menu.Sources);
-            PrintSources();
+            // Validate if the input files are okay.
+            string errorMessage = applicationManager.ValidateData();
 
-            do
+            if (!string.IsNullOrEmpty(errorMessage))
             {
-                pressedKey = Console.ReadKey().Key;
-                Console.SetCursorPosition(0, Console.CursorTop);
-                Console.Write(" ");
-                Console.SetCursorPosition(0, Console.CursorTop);
+                Console.WriteLine(errorMessage);
+                Console.WriteLine("Change and restart application. You can also delete the *.save files to create a new structure. Program will close");
+                Console.ReadLine();
+            }
+            else
+            {
+                ConsoleKey pressedKey;
+                ChangeMenu(Menu.Sources);
 
-                switch (pressedKey)
+                do
                 {
-                    case ConsoleKey.F3:
-                        this.ChangeMenu(Menu.Sources);
-                        PrintSources();
-                        break;
-                    case ConsoleKey.F4:
-                        PrintTargets();
-                        break;
-                    case ConsoleKey.F5:
-                        PrintExceptions();
-                        break;
-                    case ConsoleKey.F6:
-                        PrintJobs();
-                        break;
-                    case ConsoleKey.F7:
-                        PrintLogs();
-                        break;
-                    case ConsoleKey.F8:
-                        PrintSettings();
-                        break;
-                    case ConsoleKey.F9:
-                        ChangeMenu(this.currentMenu);
-                        break;
-                    case ConsoleKey.A:
-                        switch (currentMenu)
-                        {
-                            case Menu.Sources:
-                                AddSource();
-                                break;
-                            case Menu.Targets:
-                                AddTarget();
-                                break;
-                            case Menu.Exceptions:
-                                AddException();
-                                break;
-                        }
-                        break;
-                    case ConsoleKey.D:
-                        switch (currentMenu)
-                        {
-                            case Menu.Sources:
-                                DeleteSource();
-                                break;
-                            case Menu.Targets:
-                                DeleteTarget();
-                                break;
-                            case Menu.Exceptions:
-                                DeleteException();
-                                break;
-                        }
-                        break;
-                }
+                    pressedKey = Console.ReadKey().Key;
+                    Console.SetCursorPosition(0, Console.CursorTop);
+                    Console.Write(" ");
+                    Console.SetCursorPosition(0, Console.CursorTop);
 
-            } while (pressedKey != ConsoleKey.Escape);
+                    if (this.menus.ContainsKey(pressedKey.ToString()))
+                    {
+                        this.ChangeMenu(this.menus[pressedKey.ToString()]);
+                    }
 
-            applicationManager.SaveSettings();
+                    switch (pressedKey)
+                    {
+                        case ConsoleKey.A:
+                            switch (currentMenu)
+                            {
+                                case Menu.Sources:
+                                    AddSource();
+                                    break;
+                                case Menu.Targets:
+                                    AddTarget();
+                                    break;
+                                case Menu.Exceptions:
+                                    AddException();
+                                    break;
+                            }
+                            break;
+                        case ConsoleKey.D:
+                            switch (currentMenu)
+                            {
+                                case Menu.Sources:
+                                    DeleteSource();
+                                    break;
+                                case Menu.Targets:
+                                    DeleteTarget();
+                                    break;
+                                case Menu.Exceptions:
+                                    DeleteException();
+                                    break;
+                            }
+                            break;
+                    }
+
+                } while (pressedKey != ConsoleKey.Escape);
+
+                applicationManager.SaveSettings();
+            }
         }
 
         private void ChangeMenu(Menu? newMenu = null)
         {
             if (newMenu != null)
             {
-                this.currentMenu = newMenu.Value;
+                bool canChange = true;
+
+                if (newMenu.Value == Menu.Targets)
+                {
+                    canChange = this.ChangeToTargets();
+                }
+                else if (newMenu.Value == Menu.Exceptions)
+                {
+                    canChange = this.ChangeToExceptions();
+                }
+                else  if (newMenu.Value == Menu.Settings)
+                {
+                    this.PrintSettings();
+                    canChange = false;
+                }
+
+                if (canChange)
+                {
+                    this.currentMenu = newMenu.Value;
+                }
             }
 
             Console.ForegroundColor = ConsoleColor.DarkCyan;
@@ -150,29 +165,54 @@ namespace Synchronizer.PresentationLogic
 
             foreach (var menu in this.menus)
             {
-                Console.WriteLine(menu.Key.ToString() + " " + menu.Value);
+                Console.WriteLine(menu.Key.ToString() + "  " + menu.Value);
             }
+
+            Console.WriteLine("ESC Exit");
 
             if (currentMenu == Menu.Sources || currentMenu == Menu.Targets || currentMenu == Menu.Exceptions)
             {
-                Console.WriteLine("A  Add");
-                Console.WriteLine("D  Delete");
+                Console.WriteLine("A   Add");
+                Console.WriteLine("D   Delete");
             }
 
             Console.WriteLine("Current Menu: {0} {1}",
                 this.menus.First(p => p.Value.ToString() == this.currentMenu.ToString()).Key,
                 this.currentMenu.ToString());
 
-            if (currentMenu == Menu.Targets || currentMenu == Menu.Exceptions)
+            if ((currentMenu == Menu.Targets || currentMenu == Menu.Exceptions) && this.currentSourceId.HasValue)
             {
-                var currentSource = applicationManager.GetSources()[currentSourceId];
-                Console.WriteLine("{0} for source {1}",
+                var currentSource = applicationManager.GetSources()[currentSourceId.Value];
+                Console.WriteLine("{0} for source {1} {2}",
                     currentMenu.ToString(),
+                    this.currentSourceId,
                     currentSource);
             }
 
             Console.WriteLine(separator);
             Console.ForegroundColor = ConsoleColor.Gray;
+
+            switch (this.currentMenu)
+            {
+                case Menu.Sources:
+                    this.PrintSources();
+                    break;
+                case Menu.Targets:
+                    this.PrintTargets();
+                    break;
+                case Menu.Exceptions:
+                    this.PrintExceptions();
+                    break;
+                case Menu.Logs:
+                    this.PrintLogs();
+                    break;
+                case Menu.Jobs:
+                    this.PrintJobs();
+                    break;
+                case Menu.Help:
+                    this.ChangeMenu();
+                    break;
+            }
         }
 
         private void PrintSources()
@@ -183,14 +223,9 @@ namespace Synchronizer.PresentationLogic
 
         private void AddSource()
         {
-            string newDirectoryPath;
-            var sources = applicationManager.GetSources();
-
-            if (GetPathInput(out newDirectoryPath, sources, PathOperation.Source))
+            if (AddPath(PathOperation.Source))
             {
-                applicationManager.AddSource(newDirectoryPath);
                 this.ChangeMenu();
-                PrintSources();
             }
             else
             {
@@ -208,11 +243,10 @@ namespace Synchronizer.PresentationLogic
             else
             {
                 int id;
-                if (GetIdInputFromCollection(out id, sources, IdOperation.Delete))
+                if (GetIdInputFromCollection(out id, sources, IdOperation.DeleteSource))
                 {
                     applicationManager.DeleteSource(id);
                     this.ChangeMenu(Menu.Sources);
-                    this.PrintSources();
                 }
                 else
                 {
@@ -232,18 +266,20 @@ namespace Synchronizer.PresentationLogic
 
                 switch (operation)
                 {
-                    case IdOperation.Delete:
+                    case IdOperation.DeleteSource:
+                    case IdOperation.DeleteTarget:
+                    case IdOperation.DeleteException:
                         information = " to delete";
                         break;
-                    case IdOperation.Targets:
+                    case IdOperation.GetTargets:
                         information = " for targets";
                         break;
-                    case IdOperation.Exceptions:
+                    case IdOperation.GetExceptions:
                         information = " for sources";
                         break;
                 }
 
-                Console.Write("Enter source id {0} (exit to cancel): ", information);
+                Console.Write("Enter id {0} (exit to cancel): ", information);
                 string input = Console.ReadLine().Trim();
 
                 if (input == "exit")
@@ -256,6 +292,22 @@ namespace Synchronizer.PresentationLogic
                 if (isValidNumber && id >= 0 && id < collection.Count())
                 {
                     isValid = true;
+                    string errorMessage = null;
+
+                    switch (operation)
+                    {
+                        case IdOperation.DeleteException:
+                            errorMessage = applicationManager.DeleteException(this.currentSourceId.Value, id);
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        isValid = false;
+                        Console.WriteLine("Couldn't delete exception {0}:\r\n{1}", id, errorMessage);
+                    }
                 }
                 else
                 {
@@ -267,40 +319,40 @@ namespace Synchronizer.PresentationLogic
             return true;
         }
 
-        private void PrintTargets()
+        private bool ChangeToTargets()
         {
             var sources = applicationManager.GetSources();
             if (sources.Count() == 0)
             {
                 Console.WriteLine("Can't open targets because there are no sources.");
-                this.ChangeMenu(Menu.Sources);
+                return false;
             }
             else
             {
                 int sourceId;
-                if (this.GetIdInputFromCollection(out sourceId, sources, IdOperation.Targets))
+                if (this.GetIdInputFromCollection(out sourceId, sources, IdOperation.GetTargets))
                 {
                     this.currentSourceId = sourceId;
-                    this.ChangeMenu(Menu.Targets);
-                    this.PrintListWithIndex(applicationManager.GetTargets(sourceId));
+                    return true;
                 }
                 else
                 {
                     Console.WriteLine("No id entered.");
-                    this.ChangeMenu(Menu.Sources);
+                    return false;
                 }
             }
         }
 
+        private void PrintTargets()
+        {
+            this.PrintListWithIndex(applicationManager.GetTargets(this.currentSourceId.Value));
+        }
+
         private void AddTarget()
         {
-            string newDirectoryPath = null;
-
-            if (GetPathInput(out newDirectoryPath, null, PathOperation.Target))
+            if (!AddPath(PathOperation.Target))
             {
-                applicationManager.AddTarget(currentSourceId, newDirectoryPath);
                 this.ChangeMenu();
-                this.PrintListWithIndex(applicationManager.GetTargets(this.currentSourceId));
             }
             else
             {
@@ -310,43 +362,88 @@ namespace Synchronizer.PresentationLogic
 
         private void DeleteTarget()
         {
+            var targets = applicationManager.GetTargets(this.currentSourceId.Value);
 
+            if (targets == null || targets.Count == 0)
+            {
+                Console.WriteLine("Can't delete target because there are no targets.");
+            }
+            else
+            {
+                int id;
+                if (GetIdInputFromCollection(out id, targets, IdOperation.DeleteTarget))
+                {
+                    applicationManager.DeleteTarget(this.currentSourceId.Value, id);
+                    this.ChangeMenu();
+                }
+                else
+                {
+                    Console.WriteLine("No id entered.");
+                }
+            }
         }
 
-        private void PrintExceptions()
+        private bool ChangeToExceptions()
         {
             var sources = applicationManager.GetSources();
             if (sources.Count() == 0)
             {
                 Console.WriteLine("Can't open exceptions because there are no sources");
-                this.ChangeMenu(Menu.Sources);
+                return false;
             }
             else
             {
                 int sourceId;
-                if (this.GetIdInputFromCollection(out sourceId, sources, IdOperation.Exceptions))
+                if (this.GetIdInputFromCollection(out sourceId, sources, IdOperation.GetExceptions))
                 {
                     this.currentSourceId = sourceId;
-                    this.ChangeMenu(Menu.Exceptions);
-                    this.PrintListWithIndex(applicationManager.GetExceptions(sourceId));
+                    return true;
                 }
                 else
                 {
                     Console.WriteLine("No id entered");
-                    this.ChangeMenu(Menu.Sources);
+                    return false;
                 }
-
             }
+        }
+
+        private void PrintExceptions()
+        {
+            this.PrintListWithIndex(applicationManager.GetExceptions(this.currentSourceId.Value));
         }
 
         private void AddException()
         {
-
+            if (AddPath(PathOperation.Exception))
+            {
+                this.ChangeMenu();
+            }
+            else
+            {
+                Console.WriteLine("No path entered");
+            }
         }
 
         private void DeleteException()
         {
+            var exceptions = applicationManager.GetExceptions(this.currentSourceId.Value);
 
+            if (exceptions == null || exceptions.Count == 0)
+            {
+                Console.WriteLine("Can't delete exception because there are no exceptions.");
+            }
+            else
+            {
+                int id;
+                if (GetIdInputFromCollection(out id, exceptions, IdOperation.DeleteException))
+                {
+                    this.ChangeMenu();
+                }
+                else
+                {
+                    Console.WriteLine("No id entered.");
+                }
+            }
         }
 
         private void PrintJobs()
@@ -365,7 +462,115 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintSettings()
         {
+            string blockCompareMinFileSize = Convert.ToString(applicationManager.GetBlockCompareMinFileSize());
+            string blockCompareBlockSize = Convert.ToString(applicationManager.GetBlockCompareBlockSize());
+            string parallelSync = Convert.ToString(applicationManager.GetParallelSync());
 
+            Console.WriteLine("The current settings are:");
+            Console.WriteLine("Block compare minimal file size: " + blockCompareMinFileSize);
+            Console.WriteLine("Block compare block size: " + blockCompareBlockSize);
+            Console.WriteLine("Parallel synchronisation: " + parallelSync);
+
+            string input;
+            bool goodInput;
+
+            // Get want to change value
+            do
+            {
+                Console.Write("Want to change? y/n ");
+                input = Console.ReadLine().Trim().ToLower();
+                if (input != "y" && input != "n")
+                {
+                    goodInput = false;
+                    Console.WriteLine("Invalid input. Must be \"n\" or \"y\"");
+                }
+                else
+                {
+                    goodInput = true;
+                }
+
+            } while (!goodInput);
+
+            uint newValue = 0;
+
+            if (input == "y")
+            {
+                // Get block compare minimal file size value
+                do
+                {
+                    Console.Write("New block compare minimal file size (empty to keep {0}): ", blockCompareMinFileSize);
+                    input = Console.ReadLine().Trim();
+
+                    if (input == string.Empty)
+                    {
+                        goodInput = true;
+                    }
+                    else if (UInt32.TryParse(input, out newValue))
+                    {
+                        applicationManager.SetBlockCompareMinFileSize(newValue);
+                        goodInput = true;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error, value must be a number between 0 and " + UInt32.MaxValue);
+                        goodInput = false;
+                    }
+                } while (!goodInput);
+
+                // Get block compare block size value
+                do
+                {
+                    Console.Write("New block compare block size (empty to keep {0}): ", blockCompareBlockSize);
+                    input = Console.ReadLine().Trim();
+
+                    if (input == string.Empty)
+                    {
+                        goodInput = true;
+                    }
+                    else if (UInt32.TryParse(input, out newValue))
+                    {
+                        // Value 0 doesn't make sense for block size comparison value.
+                        if (newValue == 0)
+                        {
+                            goodInput = false;
+                        }
+                        else
+                        {
+                            applicationManager.SetBlockCompareBlockSize(newValue);
+                            goodInput = true;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error, value must be a number between 1 and " + UInt32.MaxValue);
+                        goodInput = false;
+                    }
+
+                } while (!goodInput);
+
+                // Get parallel sync value
+                bool newParallelSyncValue = false;
+                do
+                {
+                    Console.Write("New block compare block size (empty to keep {0}): ", parallelSync);
+                    input = Console.ReadLine().Trim();
+
+                    if (input == string.Empty)
+                    {
+                        goodInput = true;
+                    }
+                    else if (Boolean.TryParse(input, out newParallelSyncValue))
+                    {
+                        applicationManager.SetBlockCompareBlockSize(newValue);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error, value must be a \"true\" or \"false\"");
+                        goodInput = false;
+                    }
+
+                } while (!goodInput);
+            }
         }
 
         private void PrintListWithIndex(List<string> values)
@@ -383,9 +588,8 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
-        private bool GetPathInput(out string resultPath, List<string> existingPaths, PathOperation operation)
+        private bool AddPath(PathOperation operation)
         {
-            resultPath = string.Empty;
             string path;
             bool isValid = false;
 
@@ -414,24 +618,39 @@ namespace Synchronizer.PresentationLogic
                 if (path == "exit")
                 {
                     return false;
-                }
-
-                if (!Directory.Exists(path))
+                } else if (!Directory.Exists(path))
                 {
                     Console.WriteLine("Error. Not a valid path.");
                 }
-                else if (existingPaths != null && existingPaths.Any(p => Path.GetFullPath(p) == Path.GetFullPath(path)))
-                {
-                    Console.WriteLine("Error. This path already exists");
-                }
                 else
                 {
-                    isValid = true;
-                }
+                    string errorMessage = null;
 
+                    switch (operation)
+                    {
+                        case PathOperation.Source:
+                            errorMessage = applicationManager.AddSource(path);
+                            break;
+                        case PathOperation.Target:
+                            errorMessage = applicationManager.AddTarget(this.currentSourceId.Value, path);
+                            break;
+                        case PathOperation.Exception:
+                            errorMessage = applicationManager.AddException(this.currentSourceId.Value, path);
+                            break;
+                    }
+
+                    if (errorMessage != null)
+                    {
+                        isValid = false;
+                        Console.WriteLine("Couldn't add {0}:\r\n{1}", operation.ToString(), errorMessage);
+                    }
+                    else
+                    {
+                        isValid = true;
+                    }
+                }
             } while (!isValid);
 
-            resultPath = path;
             return true;
         }
     }

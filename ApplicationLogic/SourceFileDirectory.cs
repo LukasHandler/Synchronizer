@@ -9,13 +9,14 @@ namespace Synchronizer.ApplicationLogic
     [Serializable()]
     public class SourceFileDirectory : FileDirectory
     {
-        public List<FileDirectory> TargetDirectories { get; set; }
+        public List<FileDirectory> Targets { get; set; }
 
         public List<FileDirectory> Exceptions { get; set; }
 
         public SourceFileDirectory(string directoryPath) : base(directoryPath)
         {
-            this.TargetDirectories = new List<FileDirectory>();
+            this.Targets = new List<FileDirectory>();
+            this.Exceptions = new List<FileDirectory>();
         }
 
         private SourceFileDirectory()
