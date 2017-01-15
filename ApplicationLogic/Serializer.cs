@@ -54,7 +54,8 @@ namespace Synchronizer.ApplicationLogic
             {
                 Type outType = typeof(T);
 
-                XmlSerializer serializer = new XmlSerializer(outType);
+                // http://stackoverflow.com/questions/1127431/xmlserializer-giving-filenotfoundexception-at-constructor
+                XmlSerializer serializer = XmlSerializer.FromTypes(new[] { outType })[0];
                 using (XmlReader reader = new XmlTextReader(read))
                 {
                     objectOut = (T)serializer.Deserialize(reader);
@@ -68,7 +69,7 @@ namespace Synchronizer.ApplicationLogic
 
         public static T CopyObject<T>(T objectToCopy)
         {
-            XmlSerializer serializer = new XmlSerializer(objectToCopy.GetType());
+            XmlSerializer serializer = XmlSerializer.FromTypes(new[] { typeof(T) })[0];
             T result;
 
             using (MemoryStream stream = new MemoryStream())

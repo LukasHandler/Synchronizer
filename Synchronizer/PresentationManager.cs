@@ -350,7 +350,7 @@ namespace Synchronizer.PresentationLogic
 
         private void AddTarget()
         {
-            if (!AddPath(PathOperation.Target))
+            if (AddPath(PathOperation.Target))
             {
                 this.ChangeMenu();
             }
@@ -613,12 +613,16 @@ namespace Synchronizer.PresentationLogic
                 }
 
                 Console.Write("Enter path for new {0} (\"exit\" to cancel): ", information);
-                path = Console.ReadLine().Replace('/', '\\').Trim().TrimEnd('\\').ToLower();
+                string input = Console.ReadLine();
 
-                if (path == "exit")
+                if (input == "exit")
                 {
                     return false;
-                } else if (!Directory.Exists(path))
+                }
+
+                path = PathHelper.ChangePathToDefaultPath(input);
+
+                if (!Directory.Exists(path))
                 {
                     Console.WriteLine("Error. Not a valid path.");
                 }

@@ -71,11 +71,19 @@ namespace Synchronizer.ApplicationLogic
             return sourceDirectories.Select(p => p.ToString()).ToList();
         }
 
-        public string AddSource(string path)
+        public string AddSource(string path, bool recursive = false)
         {
+            var newSource = new SourceFileDirectory(path, recursive);
             var newDirectories = Serializer.CopyObject(this.sourceDirectories);
-            newDirectories.Add(new SourceFileDirectory(path));
-            return this.isValid(newDirectories);
+            newDirectories.Add(newSource);
+            var errorMessage = PathHelper.IsValid(newDirectories);
+
+            if (string.IsNullOrEmpty(errorMessage))
+            {
+                this.sourceDirectories.Add(newSource);
+            }
+
+            return errorMessage;
         }
 
         public void DeleteSource(int sourceId)
@@ -90,9 +98,17 @@ namespace Synchronizer.ApplicationLogic
 
         public string AddTarget(int sourceId, string path)
         {
+            var newTarget = new FileDirectory(path);
             var newDirectories = Serializer.CopyObject(this.sourceDirectories);
-            newDirectories[sourceId].Targets.Add(new FileDirectory(path));
-            return this.isValid(newDirectories);
+            newDirectories[sourceId].Targets.Add(newTarget);
+            var errorMessage = PathHelper.IsValid(newDirectories);
+
+            if (string.IsNullOrEmpty(errorMessage))
+            {
+                this.sourceDirectories[sourceId].Targets.Add(newTarget);
+            }
+
+            return errorMessage;
         }
 
         public void DeleteTarget(int sourceId, int targetId)
@@ -107,16 +123,31 @@ namespace Synchronizer.ApplicationLogic
 
         public string AddException(int sourceId, string path)
         {
+            var newException = new FileDirectory(path);
             var newDirectories = Serializer.CopyObject(this.sourceDirectories);
-            newDirectories[sourceId].Exceptions.Add(new FileDirectory(path));
-            return this.isValid(newDirectories);
+            newDirectories[sourceId].Exceptions.Add(newException);
+            var errorMessage = PathHelper.IsValid(newDirectories);
+
+            if (string.IsNullOrEmpty(errorMessage))
+            {
+                this.sourceDirectories[sourceId].Exceptions.Add(newException);
+            }
+
+            return errorMessage;
         }
 
         public string DeleteException(int sourceId, int exceptionId)
         {
             var newDirectories = Serializer.CopyObject(this.sourceDirectories);
             newDirectories[sourceId].Exceptions.RemoveAt(exceptionId);
-            return this.isValid(newDirectories);
+            var errorMessage = PathHelper.IsValid(newDirectories);
+
+            if (string.IsNullOrEmpty(errorMessage))
+            {
+                this.sourceDirectories[sourceId].Exceptions.RemoveAt(exceptionId);
+            }
+
+            return errorMessage;
         }
 
         public List<string> GetJobs()
@@ -162,21 +193,6 @@ namespace Synchronizer.ApplicationLogic
         private void Log(string message)
         {
             this.logs.Add(DateTime.Now.ToString("dd.MM.yyyy-HH:mm:ss:FF") + " " + message);
-        }
-
-        private string isValid(List<SourceFileDirectory> newDirectories)
-        {
-            string errorMessage = PathHelper.IsValid(newDirectories);
-
-            if (!string.IsNullOrEmpty(errorMessage))
-            {
-                return errorMessage;
-            }
-            else
-            {
-                this.sourceDirectories = newDirectories;
-                return null;
-            }
         }
     }
 }

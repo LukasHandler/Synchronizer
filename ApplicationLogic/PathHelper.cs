@@ -28,9 +28,76 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
-        public static string ChangePathToDefaultPath(string path)
+        public static string RemoveFileFromDirectoryPath(string full, string toDelete)
         {
-            return path.Replace('/', '\\').Trim().TrimEnd('\\').ToLower();
+            // http://stackoverflow.com/questions/2201595/c-sharp-simplest-way-to-remove-first-occurance-of-a-substring-from-another-str
+            int index = full.IndexOf(toDelete);
+            return PathHelper.ChangePathToDefaultPath(full.Remove(index, toDelete.Length));
+        }
+
+        public static string ChangePathToDefaultPath(string path, bool isFile = false)
+        {
+            string newPath = path.Replace('/', '\\').Trim().TrimEnd('\\');
+
+            if (isFile)
+            {
+                var objectName = newPath.Split('\\').Last();
+                int index = newPath.IndexOf(objectName);
+                string dictionaryPath = PathHelper.ChangePathToDefaultPath(newPath.Remove(index, objectName.Length));
+                newPath = dictionaryPath.ToLower() + objectName;
+            }
+            else
+            {
+                newPath = newPath.ToLower();
+                newPath += '\\';
+            }
+
+            return newPath;
+        }
+
+        public static string GetLogicalDriveName(string path)
+        {
+            string defaultPath = ChangePathToDefaultPath(path);
+            
+            if (defaultPath.Contains(':'))
+            {
+                return defaultPath.Split(':').First();
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static bool CanSynchronize(List<string> pathes)
+        {
+            if (pathes == null || pathes.Count <= 1)
+            {
+                return false;
+            }
+
+            List<string> foundLogicalNames = new List<string>();
+
+            foreach (var path in pathes)
+            {
+                string logicalName = GetLogicalDriveName(path);
+                
+                if (string.IsNullOrEmpty(logicalName))
+                {
+                    return false;
+                }
+
+                if (foundLogicalNames.Contains(logicalName))
+                {
+                    return false;
+                }
+                else
+                {
+                    foundLogicalNames.Add(logicalName);
+                }
+            }
+
+            return true;
         }
 
         // Validate whole structure.
@@ -60,7 +127,7 @@ namespace Synchronizer.ApplicationLogic
                     }
                     else
                     {
-                        target.Path = ChangePathToDefaultPath(source.Path);
+                        target.Path = ChangePathToDefaultPath(target.Path);
                     }
                 }
 
@@ -77,6 +144,11 @@ namespace Synchronizer.ApplicationLogic
                         exception.Path = ChangePathToDefaultPath(exception.Path);
                     }
                 }
+
+                if (!source.WatcherCreated)
+                {
+                    source.InitWatcher();
+                }
             }
 
             // Validate each source
@@ -88,7 +160,25 @@ namespace Synchronizer.ApplicationLogic
                 // The same source twice?
                 if (sourceDirectories.Where(p => IsSamePath(p.Path, source.Path)).Count() > 1)
                 {
-                    return string.Format("The source {0} {1} appears more than once in sources", sourceIndex, source.Path);
+                    return string.Format("The source {0} appears more than once in sources", source.Path);
+                }
+
+                // The same target twice
+                foreach (var target in source.Targets)
+                {
+                    if (source.Targets.Where(p => IsSamePath(p.Path, target.Path)).Count() > 1)
+                    {
+                        return string.Format("The target {0} appears more than once in targets", target.Path);
+                    }
+                }
+
+                // The same exception twice
+                foreach (var exception in source.Targets)
+                {
+                    if (source.Exceptions.Where(p => IsSamePath(p.Path, exception.Path)).Count() > 1)
+                    {
+                        return string.Format("The exception {0} appears more than once in exceptions", exception.Path);
+                    }
                 }
 
                 // Any source who is a parent to the current one and not an exception in the parent entry?
@@ -120,7 +210,7 @@ namespace Synchronizer.ApplicationLogic
                 }
 
                 // Any same exceptions or exceptions are not child of source?
-                var conflictException = source.Targets.FirstOrDefault(p => IsSamePath(source.Path, p.Path) || !IsSubDirectoryOfPath(p.Path, source.Path));
+                var conflictException = source.Exceptions.FirstOrDefault(p => IsSamePath(source.Path, p.Path) || !IsSubDirectoryOfPath(p.Path, source.Path));
 
                 if (conflictException != null)
                 {
