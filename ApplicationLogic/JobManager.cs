@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Synchronizer.Shared.EventArguments;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,17 +10,22 @@ namespace Synchronizer.ApplicationLogic
 {
     public static class JobManager
     {
-        private static ConcurrentBag<Job> ProcessedJobs;
+        public static ConcurrentQueue<Job> Jobs;
 
-        private static  ConcurrentQueue<Job> Jobs;
+        public static List<Job> ProcessedJobs;
 
         private static Task jobTask;
 
+        private static object Locker;
+
         static JobManager()
         {
-            ProcessedJobs = new ConcurrentBag<Job>();
+            Locker = new object();
+            ProcessedJobs = new List<Job>();
             Jobs = new ConcurrentQueue<Job>();
         }
+
+        public static EventHandler<LogEventArguments> OnLog;
 
         private static void WorkOnJobs()
         {
@@ -31,8 +37,16 @@ namespace Synchronizer.ApplicationLogic
                 if (Jobs.TryDequeue(out currentJob))
                 {
                     currentJob.JobState = Job.JobStates.Processed;
-                    ProcessedJobs.Add(currentJob);
+                    lock (Locker)
+                    {
+                        ProcessedJobs.Add(currentJob);
+                    }
                     currentJob.Execute();
+                   
+                    lock (Locker)
+                    {
+                        ProcessedJobs.Remove(currentJob);
+                    }
                 }
                 else
                 {
@@ -42,7 +56,7 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
-        public static void AddJob(Job newJob)
+        internal static void AddJob(Job newJob)
         {
             Jobs.Enqueue(newJob);
 
@@ -50,6 +64,18 @@ namespace Synchronizer.ApplicationLogic
             {
                 jobTask = new Task(WorkOnJobs);
                 jobTask.Start();
+            }
+        }
+
+        public static bool HasFinished()
+        {
+            if (Jobs == null || Jobs.Count == 0)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
             }
         }
     }

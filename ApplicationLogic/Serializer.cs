@@ -22,7 +22,9 @@ namespace Synchronizer.ApplicationLogic
             if (serializableObject == null) { return; }
 
             XmlDocument xmlDocument = new XmlDocument();
-            XmlSerializer serializer = new XmlSerializer(serializableObject.GetType());
+
+            // http://stackoverflow.com/questions/1127431/xmlserializer-giving-filenotfoundexception-at-constructor
+            XmlSerializer serializer = XmlSerializer.FromTypes(new[] { typeof(T) })[0];
             using (MemoryStream stream = new MemoryStream())
             {
                 serializer.Serialize(stream, serializableObject);
@@ -54,7 +56,6 @@ namespace Synchronizer.ApplicationLogic
             {
                 Type outType = typeof(T);
 
-                // http://stackoverflow.com/questions/1127431/xmlserializer-giving-filenotfoundexception-at-constructor
                 XmlSerializer serializer = XmlSerializer.FromTypes(new[] { outType })[0];
                 using (XmlReader reader = new XmlTextReader(read))
                 {

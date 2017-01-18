@@ -17,6 +17,8 @@ namespace Synchronizer.PresentationLogic
 
         private ConcurrentBag<string> Logs;
 
+        private ConcurrentBag<string> JobLogs;
+
         private enum Menu
         {
             Sources,
@@ -62,8 +64,17 @@ namespace Synchronizer.PresentationLogic
             this.menus.Add("F9", Menu.Help);
 
             this.Logs = new ConcurrentBag<string>();
+            this.JobLogs = new ConcurrentBag<string>();
             this.applicationManager = new ApplicationManager();
+
+            JobManager.OnLog += NewJobLog;
+
             this.currentSourceId = 0;
+        }
+
+        private void NewJobLog(object sender, LogEventArguments e)
+        {
+            this.JobLogs.Add(DateTime.Now.ToString("ddMMyyyy:HHmmss") + e.LogMessage);
         }
 
         public void Start()
@@ -81,6 +92,7 @@ namespace Synchronizer.PresentationLogic
             {
                 ConsoleKey pressedKey;
                 ChangeMenu(Menu.Sources);
+                bool quit = false;
 
                 do
                 {
@@ -124,11 +136,50 @@ namespace Synchronizer.PresentationLogic
                                     break;
                             }
                             break;
+                        case ConsoleKey.Escape:
+                            {
+                                quit = CanEscape();
+                                break;
+                            }
                     }
 
-                } while (pressedKey != ConsoleKey.Escape);
+                } while (!quit);
+
+
 
                 applicationManager.SaveSettings();
+            }
+        }
+
+        private bool CanEscape()
+        {
+            if (JobManager.HasFinished())
+            {
+                return true;
+            }
+            else
+            {
+                bool validAnswer;
+                string input;
+                Console.Write("Warning: Not all jobs completed, closing the program now leads to an asynchronous program state.\r\nAre you sure you want to close? y/n ");
+
+                do
+                {
+                    validAnswer = false;
+                    input = Console.ReadLine().Trim().ToLower();
+
+                    if (input == "y" || input == "n")
+                    {
+                        validAnswer = true;
+                    }
+                    else
+                    {
+                        Console.Write("Error. Input must be \"y\" or \"n\" ");
+                    }
+
+                } while (!validAnswer);
+
+                return input == "y" ? true : false;
             }
         }
 
@@ -448,7 +499,11 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintJobs()
         {
-
+            var jobs = applicationManager.GetJobs();
+            foreach (var item in jobs)
+            {
+                Console.WriteLine(item);
+            }
         }
 
         private void PrintLogs()

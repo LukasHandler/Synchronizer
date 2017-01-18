@@ -42,7 +42,7 @@ namespace Synchronizer.ApplicationLogic
 
         public string ValidateData()
         {
-            return PathHelper.IsValid(this.sourceDirectories);
+            return PathHelper.IsValid(this.sourceDirectories, true);
         }
 
         public void SaveSettings()
@@ -152,7 +152,7 @@ namespace Synchronizer.ApplicationLogic
 
         public List<string> GetJobs()
         {
-            throw new NotImplementedException();
+            return JobManager.ProcessedJobs.Select(p => p.ToString()).Concat(JobManager.Jobs.Select(p => p.ToString())).ToList();
         }
 
         public List<string> GetLogs()

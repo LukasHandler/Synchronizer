@@ -13,7 +13,6 @@ namespace Synchronizer.ApplicationLogic
         {
             Valid,
             SourceAlreadyExists,
-
         }
 
         public static bool IsSamePath(string path1, string path2)
@@ -101,7 +100,7 @@ namespace Synchronizer.ApplicationLogic
         }
 
         // Validate whole structure.
-        public static string IsValid(List<SourceFileDirectory> sourceDirectories)
+        public static string IsValid(List<SourceFileDirectory> sourceDirectories, bool onStart = false)
         {
             // Validate all pathes and change the layout.
             foreach (var source in sourceDirectories)
@@ -145,7 +144,7 @@ namespace Synchronizer.ApplicationLogic
                     }
                 }
 
-                if (!source.WatcherCreated)
+                if (onStart)
                 {
                     source.InitWatcher();
                 }

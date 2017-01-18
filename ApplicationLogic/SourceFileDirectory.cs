@@ -14,8 +14,6 @@ namespace Synchronizer.ApplicationLogic
 
         public List<FileDirectory> Exceptions { get; set; }
 
-        public bool WatcherCreated { get; set; }
-
         public SourceFileDirectory(string directoryPath, bool recursive) : base(directoryPath)
         {
             this.Targets = new List<FileDirectory>();
@@ -32,7 +30,6 @@ namespace Synchronizer.ApplicationLogic
             watcher.Renamed += CreateJob;
             watcher.IncludeSubdirectories = true;
             watcher.EnableRaisingEvents = true;
-            this.WatcherCreated = true;
         }
 
         private void CreateJob(object sender, FileSystemEventArgs eventArgs)
@@ -63,7 +60,17 @@ namespace Synchronizer.ApplicationLogic
                                 oldFile = new FileInfo(System.IO.Path.Combine(target.Path, renamedArgs.OldName));
                             }
 
-                            jobEntries.Add(new JobEntry(sourceFile, targetFile, eventArgs.ChangeType, oldFile));
+                            bool isDirectory;
+                            if (eventArgs.ChangeType != WatcherChangeTypes.Deleted)
+                            {
+                                isDirectory = sourceFile.Attributes.HasFlag(FileAttributes.Directory);
+                            }
+                            else
+                            {
+                                isDirectory = targetFile.Attributes.HasFlag(FileAttributes.Directory);
+                            }
+
+                            jobEntries.Add(new JobEntry(sourceFile, targetFile, eventArgs.ChangeType, isDirectory, oldFile));
                         }
 
                         Job newJob = new Job(jobEntries);
@@ -82,7 +89,17 @@ namespace Synchronizer.ApplicationLogic
                                 oldFile = new FileInfo(System.IO.Path.Combine(target.Path, renamedArgs.OldName));
                             }
 
-                            JobEntry entry = new JobEntry(sourceFile, targetFile, eventArgs.ChangeType, oldFile);
+                            bool isDirectory;
+                            if (eventArgs.ChangeType != WatcherChangeTypes.Deleted)
+                            {
+                                isDirectory = sourceFile.Attributes.HasFlag(FileAttributes.Directory);
+                            }
+                            else
+                            {
+                                isDirectory = targetFile.Attributes.HasFlag(FileAttributes.Directory);
+                            }
+
+                            JobEntry entry = new JobEntry(sourceFile, targetFile, eventArgs.ChangeType, isDirectory, oldFile);
                             Job newJob = new Job(entry);
                             JobManager.AddJob(newJob);
                         }
