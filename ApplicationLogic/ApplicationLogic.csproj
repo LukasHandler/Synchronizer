@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ApplicationManager.cs" />
+    <Compile Include="AttributeManager.cs" />
     <Compile Include="FileDirectory.cs" />
     <Compile Include="Job.cs" />
     <Compile Include="JobEntry.cs" />

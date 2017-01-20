@@ -218,6 +218,12 @@ namespace Synchronizer.ApplicationLogic
                 }
             }
 
+            // Synchronize sources
+            foreach (var sourceDirectory in sourceDirectories)
+            {
+                sourceDirectory.SynchronizeDirectoryRecursive();
+            }
+
             return null;
         }
 

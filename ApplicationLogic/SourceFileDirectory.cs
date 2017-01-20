@@ -113,6 +113,100 @@ namespace Synchronizer.ApplicationLogic
 
         }
 
+        public void SynchronizeDirectoryRecursive(string directoryPath = null)
+        {
+            if (directoryPath == null)
+            {
+                directoryPath = this.Path;
+            }
+
+            // Create files in current directory
+            SynchronizeDirectory(PathHelper.ChangePathToDefaultPath(directoryPath));
+
+            // Synchronize resursive
+            var directories = Directory.GetDirectories(directoryPath, "*.*", SearchOption.AllDirectories);
+            foreach (var directory in directories)
+            {
+                var directoryPathDefaultPath = PathHelper.ChangePathToDefaultPath(directory);
+                SynchronizeDirectory(directoryPathDefaultPath);
+            }
+        }
+
+        private void SynchronizeDirectory(string directoryPath)
+        {
+            string pathWithoutSource = directoryPath.Substring(this.Path.Count());
+
+            // If directory is not an exception or a subdirectory of an exception, copy directory
+            if (!this.Exceptions.Any(p => PathHelper.IsSamePath(p.Path, directoryPath) || PathHelper.IsSubDirectoryOfPath(directoryPath, p.Path)))
+            {
+                // Create folder in target
+                foreach (var target in this.Targets)
+                {
+                    string targetDirectoryPath = System.IO.Path.Combine(target.Path, pathWithoutSource);
+                    if (!Directory.Exists(targetDirectoryPath))
+                    {
+                        JobEntry newJobEntry = new JobEntry(new FileInfo(directoryPath), new FileInfo(targetDirectoryPath), WatcherChangeTypes.Created, true, null);
+                        Job newJob = new Job(newJobEntry);
+                        JobManager.AddJob(newJob);
+                    }
+                }
+
+                foreach (var file in Directory.GetFiles(directoryPath))
+                {
+                    var filePath = PathHelper.ChangePathToDefaultPath(file, true);
+                    string filePathWithoutSource = filePath.Substring(this.Path.Count());
+
+                    // Create file in target
+                    foreach (var target in this.Targets)
+                    {
+                        string targetFilePath = System.IO.Path.Combine(target.Path, filePathWithoutSource);
+                        if (!File.Exists(targetFilePath))
+                        {
+                            JobEntry newJobEntry = new JobEntry(new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null);
+                            Job newJob = new Job(newJobEntry);
+                            JobManager.AddJob(newJob);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void CopyAttributes(string sourcePath, string targetPath, bool isFile)
+        {
+            FileSystemInfo source;
+            FileSystemInfo target;
+
+            if (isFile)
+            {
+                source = new FileInfo(sourcePath);
+                target = new FileInfo(targetPath);
+            }
+            else
+            {
+                source = new DirectoryInfo(sourcePath);
+                target = new DirectoryInfo(targetPath);
+            }
+
+            target.Attributes = source.Attributes;
+            target.CreationTime = source.CreationTime;
+            target.CreationTimeUtc = source.CreationTimeUtc;
+            target.LastWriteTime = source.LastWriteTime;
+            target.LastWriteTimeUtc = source.LastWriteTimeUtc;
+            target.LastAccessTime = source.LastAccessTime;
+            target.LastAccessTimeUtc = source.LastAccessTimeUtc;
+
+            if (target.Attributes != source.Attributes ||
+            target.CreationTime != source.CreationTime ||
+            target.CreationTimeUtc != source.CreationTimeUtc ||
+            target.LastWriteTime != source.LastWriteTime ||
+            target.LastWriteTimeUtc != source.LastWriteTimeUtc ||
+            target.LastAccessTime != source.LastAccessTime ||
+            target.LastAccessTimeUtc != source.LastAccessTimeUtc)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         public override string ToString()
         {
             return this.Path;
