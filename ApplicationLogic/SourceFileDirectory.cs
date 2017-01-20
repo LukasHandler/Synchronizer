@@ -70,7 +70,7 @@ namespace Synchronizer.ApplicationLogic
                                 isDirectory = targetFile.Attributes.HasFlag(FileAttributes.Directory);
                             }
 
-                            jobEntries.Add(new JobEntry(sourceFile, targetFile, eventArgs.ChangeType, isDirectory, oldFile));
+                            jobEntries.Add(new JobEntry(this, sourceFile, targetFile, eventArgs.ChangeType, isDirectory, oldFile, false));
                         }
 
                         Job newJob = new Job(jobEntries);
@@ -99,7 +99,7 @@ namespace Synchronizer.ApplicationLogic
                                 isDirectory = targetFile.Attributes.HasFlag(FileAttributes.Directory);
                             }
 
-                            JobEntry entry = new JobEntry(sourceFile, targetFile, eventArgs.ChangeType, isDirectory, oldFile);
+                            JobEntry entry = new JobEntry(this, sourceFile, targetFile, eventArgs.ChangeType, isDirectory, oldFile, false);
                             Job newJob = new Job(entry);
                             JobManager.AddJob(newJob);
                         }
@@ -113,26 +113,31 @@ namespace Synchronizer.ApplicationLogic
 
         }
 
-        public void SynchronizeDirectoryRecursive(string directoryPath = null)
+        public void InitialSynchronization()
         {
-            if (directoryPath == null)
-            {
-                directoryPath = this.Path;
-            }
+            var directoryPath = PathHelper.ChangePathToDefaultPath(this.Path);
 
-            // Create files in current directory
-            SynchronizeDirectory(PathHelper.ChangePathToDefaultPath(directoryPath));
-
-            // Synchronize resursive
-            var directories = Directory.GetDirectories(directoryPath, "*.*", SearchOption.AllDirectories);
-            foreach (var directory in directories)
+            foreach (var target in this.Targets)
             {
-                var directoryPathDefaultPath = PathHelper.ChangePathToDefaultPath(directory);
-                SynchronizeDirectory(directoryPathDefaultPath);
+                SynchronizeDirectoryFilesRecursiveToTarget(target.Path, this.Path);
             }
         }
 
-        private void SynchronizeDirectory(string directoryPath)
+        public void SynchronizeDirectoryFilesRecursiveToTarget(string targetDirectory, string sourceDirectory)
+        {
+            sourceDirectory = PathHelper.ChangePathToDefaultPath(sourceDirectory);
+            targetDirectory = PathHelper.ChangePathToDefaultPath(targetDirectory);
+            var directories = Directory.GetDirectories(sourceDirectory, "*.*", SearchOption.AllDirectories);
+
+            SynchronizeDirectory(sourceDirectory, targetDirectory);
+
+            foreach (var directory in directories)
+            {
+                SynchronizeDirectory(directory, targetDirectory);
+            }
+        }
+
+        private void SynchronizeDirectory(string directoryPath, string targetDirectory)
         {
             string pathWithoutSource = directoryPath.Substring(this.Path.Count());
 
@@ -140,15 +145,20 @@ namespace Synchronizer.ApplicationLogic
             if (!this.Exceptions.Any(p => PathHelper.IsSamePath(p.Path, directoryPath) || PathHelper.IsSubDirectoryOfPath(directoryPath, p.Path)))
             {
                 // Create folder in target
-                foreach (var target in this.Targets)
+                var target = this.Targets.FirstOrDefault(p => PathHelper.IsSamePath(p.Path, targetDirectory) || PathHelper.IsSubDirectoryOfPath(targetDirectory, p.Path));
+
+                if (target == null)
                 {
-                    string targetDirectoryPath = System.IO.Path.Combine(target.Path, pathWithoutSource);
-                    if (!Directory.Exists(targetDirectoryPath))
-                    {
-                        JobEntry newJobEntry = new JobEntry(new FileInfo(directoryPath), new FileInfo(targetDirectoryPath), WatcherChangeTypes.Created, true, null);
-                        Job newJob = new Job(newJobEntry);
-                        JobManager.AddJob(newJob);
-                    }
+                    return;
+                }
+                targetDirectory = PathHelper.ChangePathToDefaultPath(target.Path);
+
+                string targetDirectoryPath = System.IO.Path.Combine(targetDirectory, pathWithoutSource);
+                if (!Directory.Exists(targetDirectoryPath))
+                {
+                    JobEntry newJobEntry = new JobEntry(this, new FileInfo(directoryPath), new FileInfo(targetDirectoryPath), WatcherChangeTypes.Created, true, null, true);
+                    Job newJob = new Job(newJobEntry);
+                    JobManager.AddJob(newJob);
                 }
 
                 foreach (var file in Directory.GetFiles(directoryPath))
@@ -156,56 +166,55 @@ namespace Synchronizer.ApplicationLogic
                     var filePath = PathHelper.ChangePathToDefaultPath(file, true);
                     string filePathWithoutSource = filePath.Substring(this.Path.Count());
 
-                    // Create file in target
-                    foreach (var target in this.Targets)
+                    string targetFilePath = System.IO.Path.Combine(targetDirectory, filePathWithoutSource);
+                    if (!File.Exists(targetFilePath))
                     {
-                        string targetFilePath = System.IO.Path.Combine(target.Path, filePathWithoutSource);
-                        if (!File.Exists(targetFilePath))
-                        {
-                            JobEntry newJobEntry = new JobEntry(new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null);
-                            Job newJob = new Job(newJobEntry);
-                            JobManager.AddJob(newJob);
-                        }
+                        JobEntry newJobEntry = new JobEntry(this, new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null, true);
+                        Job newJob = new Job(newJobEntry);
+                        JobManager.AddJob(newJob);
                     }
                 }
             }
         }
 
-        private void CopyAttributes(string sourcePath, string targetPath, bool isFile)
-        {
-            FileSystemInfo source;
-            FileSystemInfo target;
+        //private void SynchronizeDirectory(string directoryPath)
+        //{
+        //    string pathWithoutSource = directoryPath.Substring(this.Path.Count());
 
-            if (isFile)
-            {
-                source = new FileInfo(sourcePath);
-                target = new FileInfo(targetPath);
-            }
-            else
-            {
-                source = new DirectoryInfo(sourcePath);
-                target = new DirectoryInfo(targetPath);
-            }
+        //    // If directory is not an exception or a subdirectory of an exception, copy directory
+        //    if (!this.Exceptions.Any(p => PathHelper.IsSamePath(p.Path, directoryPath) || PathHelper.IsSubDirectoryOfPath(directoryPath, p.Path)))
+        //    {
+        //        // Create folder in target
+        //        foreach (var target in this.Targets)
+        //        {
+        //            string targetDirectoryPath = System.IO.Path.Combine(target.Path, pathWithoutSource);
+        //            if (!Directory.Exists(targetDirectoryPath))
+        //            {
+        //                JobEntry newJobEntry = new JobEntry(this, new FileInfo(directoryPath), new FileInfo(targetDirectoryPath), WatcherChangeTypes.Created, true, null);
+        //                Job newJob = new Job(newJobEntry);
+        //                JobManager.AddJob(newJob);
+        //            }
+        //        }
 
-            target.Attributes = source.Attributes;
-            target.CreationTime = source.CreationTime;
-            target.CreationTimeUtc = source.CreationTimeUtc;
-            target.LastWriteTime = source.LastWriteTime;
-            target.LastWriteTimeUtc = source.LastWriteTimeUtc;
-            target.LastAccessTime = source.LastAccessTime;
-            target.LastAccessTimeUtc = source.LastAccessTimeUtc;
+        //        foreach (var file in Directory.GetFiles(directoryPath))
+        //        {
+        //            var filePath = PathHelper.ChangePathToDefaultPath(file, true);
+        //            string filePathWithoutSource = filePath.Substring(this.Path.Count());
 
-            if (target.Attributes != source.Attributes ||
-            target.CreationTime != source.CreationTime ||
-            target.CreationTimeUtc != source.CreationTimeUtc ||
-            target.LastWriteTime != source.LastWriteTime ||
-            target.LastWriteTimeUtc != source.LastWriteTimeUtc ||
-            target.LastAccessTime != source.LastAccessTime ||
-            target.LastAccessTimeUtc != source.LastAccessTimeUtc)
-            {
-                throw new NotImplementedException();
-            }
-        }
+        //            // Create file in target
+        //            foreach (var target in this.Targets)
+        //            {
+        //                string targetFilePath = System.IO.Path.Combine(target.Path, filePathWithoutSource);
+        //                if (!File.Exists(targetFilePath))
+        //                {
+        //                    JobEntry newJobEntry = new JobEntry(this, new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null);
+        //                    Job newJob = new Job(newJobEntry);
+        //                    JobManager.AddJob(newJob);
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
 
         public override string ToString()
         {

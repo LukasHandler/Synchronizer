@@ -221,7 +221,7 @@ namespace Synchronizer.ApplicationLogic
             // Synchronize sources
             foreach (var sourceDirectory in sourceDirectories)
             {
-                sourceDirectory.SynchronizeDirectoryRecursive();
+                sourceDirectory.InitialSynchronization();
             }
 
             return null;

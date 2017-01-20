@@ -12,6 +12,22 @@ namespace Synchronizer.ApplicationLogic
     {
         public static void CopyAttributes(FileSystemInfo source, FileSystemInfo target, bool isDirectory)
         {
+            // If file or directory doesn't exist, don't change attributes
+            if (isDirectory)
+            {
+                if (!Directory.Exists(source.FullName) || !Directory.Exists(target.FullName))
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (!File.Exists(source.FullName) || !File.Exists(target.FullName))
+                {
+                    return;
+                }
+            }
+
             target.Attributes = source.Attributes;
 
             // Weird behaviour on directories, other call fixes it.
@@ -47,7 +63,7 @@ namespace Synchronizer.ApplicationLogic
                 target.LastAccessTime != source.LastAccessTime ||
                 target.LastAccessTimeUtc != source.LastAccessTimeUtc)
             {
-                return false;
+                throw new NotImplementedException();
             }
             else
             {

@@ -7,192 +7,192 @@ using System.Threading.Tasks;
 
 namespace Synchronizer.ApplicationLogic
 {
-    public class ApplicationManager
+    public static class ApplicationManager
     {
-        private List<SourceFileDirectory> sourceDirectories;
+        private static List<SourceFileDirectory> sourceDirectories;
 
-        private Settings settings;
+        internal static Settings Settings;
 
-        private List<string> logs;
+        private static List<string> logs;
 
-        public ApplicationManager()
+        static ApplicationManager()
         {
-            this.logs = new List<string>();
+            logs = new List<string>();
 
             try
             {
-                this.sourceDirectories = Serializer.DeSerializeObject<List<SourceFileDirectory>>("SourceDirectories.save");
+                sourceDirectories = Serializer.DeSerializeObject<List<SourceFileDirectory>>("SourceDirectories.save");
             }
             catch (Exception exception)
             {
-                this.Log("Couldn't load SourceDirectories.save: " + exception.Message);
-                this.sourceDirectories = new List<SourceFileDirectory>();
+                Log("Couldn't load SourceDirectories.save: " + exception.Message);
+                sourceDirectories = new List<SourceFileDirectory>();
             }
 
             try
             {
-                this.settings = Serializer.DeSerializeObject<Settings>("Settings.save");
+                Settings = Serializer.DeSerializeObject<Settings>("Settings.save");
             }
             catch (Exception exception)
             {
-                this.Log("Couldn't load Settings.save: " + exception.Message);
-                this.settings = new Settings();
+                Log("Couldn't load Settings.save: " + exception.Message);
+                Settings = new Settings();
             }
         }
 
-        public string ValidateData()
+        public static string ValidateData()
         {
-            return PathHelper.IsValid(this.sourceDirectories, true);
+            return PathHelper.IsValid(sourceDirectories, true);
         }
 
-        public void SaveSettings()
+        public static void SaveSettings()
         {
             try
             {
-                Serializer.SerializeObject(this.sourceDirectories, "SourceDirectories.save");
+                Serializer.SerializeObject(sourceDirectories, "SourceDirectories.save");
             }
             catch (Exception exception)
             {
-                this.Log("Couldn't create SourceDirectories.save: " + exception.Message);
+                Log("Couldn't create SourceDirectories.save: " + exception.Message);
             }
 
             try
             {
-                Serializer.SerializeObject(this.settings, "Settings.save");
+                Serializer.SerializeObject(Settings, "Settings.save");
             }
             catch (Exception exception)
             {
-                this.Log("Couldn't create Settings.save: " + exception.Message);
+                Log("Couldn't create Settings.save: " + exception.Message);
             }
         }
 
-        public List<string> GetSources()
+        public static List<string> GetSources()
         {
             return sourceDirectories.Select(p => p.ToString()).ToList();
         }
 
-        public string AddSource(string path, bool recursive = false)
+        public static string AddSource(string path, bool recursive = false)
         {
             var newSource = new SourceFileDirectory(path, recursive);
-            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            var newDirectories = Serializer.CopyObject(sourceDirectories);
             newDirectories.Add(newSource);
             var errorMessage = PathHelper.IsValid(newDirectories);
 
             if (string.IsNullOrEmpty(errorMessage))
             {
-                this.sourceDirectories.Add(newSource);
+                sourceDirectories.Add(newSource);
             }
 
             return errorMessage;
         }
 
-        public void DeleteSource(int sourceId)
+        public static void DeleteSource(int sourceId)
         {
-            this.sourceDirectories.RemoveAt(sourceId);
+            sourceDirectories.RemoveAt(sourceId);
         }
 
-        public List<string> GetTargets(int sourceId)
+        public static List<string> GetTargets(int sourceId)
         {
             return sourceDirectories[sourceId].Targets.Select(p => p.ToString()).ToList();
         }
 
-        public string AddTarget(int sourceId, string path)
+        public static string AddTarget(int sourceId, string path)
         {
             var newTarget = new FileDirectory(path);
-            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            var newDirectories = Serializer.CopyObject(sourceDirectories);
             newDirectories[sourceId].Targets.Add(newTarget);
             var errorMessage = PathHelper.IsValid(newDirectories);
 
             if (string.IsNullOrEmpty(errorMessage))
             {
-                this.sourceDirectories[sourceId].Targets.Add(newTarget);
+                sourceDirectories[sourceId].Targets.Add(newTarget);
             }
 
             return errorMessage;
         }
 
-        public void DeleteTarget(int sourceId, int targetId)
+        public static void DeleteTarget(int sourceId, int targetId)
         {
-            this.sourceDirectories[sourceId].Targets.RemoveAt(targetId);
+            sourceDirectories[sourceId].Targets.RemoveAt(targetId);
         }
 
-        public List<string> GetExceptions(int sourceId)
+        public static List<string> GetExceptions(int sourceId)
         {
             return sourceDirectories[sourceId].Exceptions.Select(p => p.ToString()).ToList();
         }
 
-        public string AddException(int sourceId, string path)
+        public static string AddException(int sourceId, string path)
         {
             var newException = new FileDirectory(path);
-            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            var newDirectories = Serializer.CopyObject(sourceDirectories);
             newDirectories[sourceId].Exceptions.Add(newException);
             var errorMessage = PathHelper.IsValid(newDirectories);
 
             if (string.IsNullOrEmpty(errorMessage))
             {
-                this.sourceDirectories[sourceId].Exceptions.Add(newException);
+                sourceDirectories[sourceId].Exceptions.Add(newException);
             }
 
             return errorMessage;
         }
 
-        public string DeleteException(int sourceId, int exceptionId)
+        public static string DeleteException(int sourceId, int exceptionId)
         {
-            var newDirectories = Serializer.CopyObject(this.sourceDirectories);
+            var newDirectories = Serializer.CopyObject(sourceDirectories);
             newDirectories[sourceId].Exceptions.RemoveAt(exceptionId);
             var errorMessage = PathHelper.IsValid(newDirectories);
 
             if (string.IsNullOrEmpty(errorMessage))
             {
-                this.sourceDirectories[sourceId].Exceptions.RemoveAt(exceptionId);
+                sourceDirectories[sourceId].Exceptions.RemoveAt(exceptionId);
             }
 
             return errorMessage;
         }
 
-        public List<string> GetJobs()
+        public static List<string> GetJobs()
         {
             return JobManager.ProcessedJobs.Select(p => p.ToString()).Concat(JobManager.Jobs.Select(p => p.ToString())).ToList();
         }
 
-        public List<string> GetLogs()
+        public static List<string> GetLogs()
         {
-            return this.logs;
+            return logs;
         }
 
-        public uint GetBlockCompareMinFileSize()
+        public static long GetBlockCompareMinFileSize()
         {
-            return this.settings.BlockCompareMinFileSize;
+            return Settings.BlockCompareMinFileSize;
         }
 
-        public void SetBlockCompareMinFileSize(uint value)
+        public static void SetBlockCompareMinFileSize(long value)
         {
-            this.settings.BlockCompareMinFileSize = value;
+            Settings.BlockCompareMinFileSize = value;
         }
 
-        public uint GetBlockCompareBlockSize()
+        public static int GetBlockCompareBlockSize()
         {
-            return this.settings.BlockCompareBlockSize;
+            return Settings.BlockCompareBlockSize;
         }
 
-        public void SetBlockCompareBlockSize(uint value)
+        public static void SetBlockCompareBlockSize(int value)
         {
-            this.settings.BlockCompareBlockSize = value;
+            Settings.BlockCompareBlockSize = value;
         }
 
-        public bool GetParallelSync()
+        public static bool GetParallelSync()
         {
-            return this.settings.ParallelSync;
+            return Settings.ParallelSync;
         }
 
-        public void SetParallelSync(bool value)
+        public static void SetParallelSync(bool value)
         {
-            this.settings.ParallelSync = value;
+            Settings.ParallelSync = value;
         }
 
-        private void Log(string message)
+        private static void Log(string message)
         {
-            this.logs.Add(DateTime.Now.ToString("dd.MM.yyyy-HH:mm:ss:FF") + " " + message);
+            logs.Add(DateTime.Now.ToString("dd.MM.yyyy-HH:mm:ss:FF") + " " + message);
         }
     }
 }

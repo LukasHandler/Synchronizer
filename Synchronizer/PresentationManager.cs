@@ -13,8 +13,6 @@ namespace Synchronizer.PresentationLogic
 {
     public class PresentationManager
     {
-        private ApplicationManager applicationManager;
-
         private ConcurrentBag<string> Logs;
 
         private ConcurrentBag<string> JobLogs;
@@ -65,7 +63,6 @@ namespace Synchronizer.PresentationLogic
 
             this.Logs = new ConcurrentBag<string>();
             this.JobLogs = new ConcurrentBag<string>();
-            this.applicationManager = new ApplicationManager();
 
             JobManager.OnLog += NewJobLog;
 
@@ -80,7 +77,7 @@ namespace Synchronizer.PresentationLogic
         public void Start()
         {
             // Validate if the input files are okay.
-            string errorMessage = applicationManager.ValidateData();
+            string errorMessage = ApplicationManager.ValidateData();
 
             if (!string.IsNullOrEmpty(errorMessage))
             {
@@ -147,7 +144,7 @@ namespace Synchronizer.PresentationLogic
 
 
 
-                applicationManager.SaveSettings();
+                ApplicationManager.SaveSettings();
             }
         }
 
@@ -233,7 +230,7 @@ namespace Synchronizer.PresentationLogic
 
             if ((currentMenu == Menu.Targets || currentMenu == Menu.Exceptions) && this.currentSourceId.HasValue)
             {
-                var currentSource = applicationManager.GetSources()[currentSourceId.Value];
+                var currentSource = ApplicationManager.GetSources()[currentSourceId.Value];
                 Console.WriteLine("{0} for source {1} {2}",
                     currentMenu.ToString(),
                     this.currentSourceId,
@@ -268,7 +265,7 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintSources()
         {
-            var sources = applicationManager.GetSources();
+            var sources = ApplicationManager.GetSources();
             PrintListWithIndex(sources);
         }
 
@@ -286,7 +283,7 @@ namespace Synchronizer.PresentationLogic
 
         private void DeleteSource()
         {
-            var sources = applicationManager.GetSources();
+            var sources = ApplicationManager.GetSources();
             if (sources == null || sources.Count == 0)
             {
                 Console.WriteLine("Can't delete source because there are no sources.");
@@ -296,7 +293,7 @@ namespace Synchronizer.PresentationLogic
                 int id;
                 if (GetIdInputFromCollection(out id, sources, IdOperation.DeleteSource))
                 {
-                    applicationManager.DeleteSource(id);
+                    ApplicationManager.DeleteSource(id);
                     this.ChangeMenu(Menu.Sources);
                 }
                 else
@@ -348,7 +345,7 @@ namespace Synchronizer.PresentationLogic
                     switch (operation)
                     {
                         case IdOperation.DeleteException:
-                            errorMessage = applicationManager.DeleteException(this.currentSourceId.Value, id);
+                            errorMessage = ApplicationManager.DeleteException(this.currentSourceId.Value, id);
                             break;
                         default:
                             break;
@@ -372,7 +369,7 @@ namespace Synchronizer.PresentationLogic
 
         private bool ChangeToTargets()
         {
-            var sources = applicationManager.GetSources();
+            var sources = ApplicationManager.GetSources();
             if (sources.Count() == 0)
             {
                 Console.WriteLine("Can't open targets because there are no sources.");
@@ -396,7 +393,7 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintTargets()
         {
-            this.PrintListWithIndex(applicationManager.GetTargets(this.currentSourceId.Value));
+            this.PrintListWithIndex(ApplicationManager.GetTargets(this.currentSourceId.Value));
         }
 
         private void AddTarget()
@@ -413,7 +410,7 @@ namespace Synchronizer.PresentationLogic
 
         private void DeleteTarget()
         {
-            var targets = applicationManager.GetTargets(this.currentSourceId.Value);
+            var targets = ApplicationManager.GetTargets(this.currentSourceId.Value);
 
             if (targets == null || targets.Count == 0)
             {
@@ -424,7 +421,7 @@ namespace Synchronizer.PresentationLogic
                 int id;
                 if (GetIdInputFromCollection(out id, targets, IdOperation.DeleteTarget))
                 {
-                    applicationManager.DeleteTarget(this.currentSourceId.Value, id);
+                    ApplicationManager.DeleteTarget(this.currentSourceId.Value, id);
                     this.ChangeMenu();
                 }
                 else
@@ -436,7 +433,7 @@ namespace Synchronizer.PresentationLogic
 
         private bool ChangeToExceptions()
         {
-            var sources = applicationManager.GetSources();
+            var sources = ApplicationManager.GetSources();
             if (sources.Count() == 0)
             {
                 Console.WriteLine("Can't open exceptions because there are no sources");
@@ -460,7 +457,7 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintExceptions()
         {
-            this.PrintListWithIndex(applicationManager.GetExceptions(this.currentSourceId.Value));
+            this.PrintListWithIndex(ApplicationManager.GetExceptions(this.currentSourceId.Value));
         }
 
         private void AddException()
@@ -477,7 +474,7 @@ namespace Synchronizer.PresentationLogic
 
         private void DeleteException()
         {
-            var exceptions = applicationManager.GetExceptions(this.currentSourceId.Value);
+            var exceptions = ApplicationManager.GetExceptions(this.currentSourceId.Value);
 
             if (exceptions == null || exceptions.Count == 0)
             {
@@ -499,7 +496,7 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintJobs()
         {
-            var jobs = applicationManager.GetJobs();
+            var jobs = ApplicationManager.GetJobs();
             foreach (var item in jobs)
             {
                 Console.WriteLine(item);
@@ -508,7 +505,7 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintLogs()
         {
-            var logs = applicationManager.GetLogs();
+            var logs = ApplicationManager.GetLogs();
             foreach (var log in logs)
             {
                 Console.WriteLine(log);
@@ -517,9 +514,9 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintSettings()
         {
-            string blockCompareMinFileSize = Convert.ToString(applicationManager.GetBlockCompareMinFileSize());
-            string blockCompareBlockSize = Convert.ToString(applicationManager.GetBlockCompareBlockSize());
-            string parallelSync = Convert.ToString(applicationManager.GetParallelSync());
+            string blockCompareMinFileSize = Convert.ToString(ApplicationManager.GetBlockCompareMinFileSize());
+            string blockCompareBlockSize = Convert.ToString(ApplicationManager.GetBlockCompareBlockSize());
+            string parallelSync = Convert.ToString(ApplicationManager.GetParallelSync());
 
             Console.WriteLine("The current settings are:");
             Console.WriteLine("Block compare minimal file size: " + blockCompareMinFileSize);
@@ -546,7 +543,7 @@ namespace Synchronizer.PresentationLogic
 
             } while (!goodInput);
 
-            uint newValue = 0;
+            long newValue = 0;
 
             if (input == "y")
             {
@@ -560,19 +557,20 @@ namespace Synchronizer.PresentationLogic
                     {
                         goodInput = true;
                     }
-                    else if (UInt32.TryParse(input, out newValue))
+                    else if (Int64.TryParse(input, out newValue) && newValue > 0)
                     {
-                        applicationManager.SetBlockCompareMinFileSize(newValue);
+                        ApplicationManager.SetBlockCompareMinFileSize(newValue);
                         goodInput = true;
                     }
                     else
                     {
-                        Console.WriteLine("Error, value must be a number between 0 and " + UInt32.MaxValue);
+                        Console.WriteLine("Error, value must be a number between 0 and " + Int64.MaxValue);
                         goodInput = false;
                     }
                 } while (!goodInput);
 
                 // Get block compare block size value
+                int newBlockCompareSize;
                 do
                 {
                     Console.Write("New block compare block size (empty to keep {0}): ", blockCompareBlockSize);
@@ -582,7 +580,7 @@ namespace Synchronizer.PresentationLogic
                     {
                         goodInput = true;
                     }
-                    else if (UInt32.TryParse(input, out newValue))
+                    else if (Int32.TryParse(input, out newBlockCompareSize))
                     {
                         // Value 0 doesn't make sense for block size comparison value.
                         if (newValue == 0)
@@ -591,13 +589,13 @@ namespace Synchronizer.PresentationLogic
                         }
                         else
                         {
-                            applicationManager.SetBlockCompareBlockSize(newValue);
+                            ApplicationManager.SetBlockCompareBlockSize(newBlockCompareSize);
                             goodInput = true;
                         }
                     }
                     else
                     {
-                        Console.WriteLine("Error, value must be a number between 1 and " + UInt32.MaxValue);
+                        Console.WriteLine("Error, value must be a number between 1 and " + Int32.MaxValue);
                         goodInput = false;
                     }
 
@@ -616,7 +614,7 @@ namespace Synchronizer.PresentationLogic
                     }
                     else if (Boolean.TryParse(input, out newParallelSyncValue))
                     {
-                        applicationManager.SetBlockCompareBlockSize(newValue);
+                        ApplicationManager.SetParallelSync(newParallelSyncValue);
                     }
                     else
                     {
@@ -688,13 +686,13 @@ namespace Synchronizer.PresentationLogic
                     switch (operation)
                     {
                         case PathOperation.Source:
-                            errorMessage = applicationManager.AddSource(path);
+                            errorMessage = ApplicationManager.AddSource(path);
                             break;
                         case PathOperation.Target:
-                            errorMessage = applicationManager.AddTarget(this.currentSourceId.Value, path);
+                            errorMessage = ApplicationManager.AddTarget(this.currentSourceId.Value, path);
                             break;
                         case PathOperation.Exception:
-                            errorMessage = applicationManager.AddException(this.currentSourceId.Value, path);
+                            errorMessage = ApplicationManager.AddException(this.currentSourceId.Value, path);
                             break;
                     }
 
