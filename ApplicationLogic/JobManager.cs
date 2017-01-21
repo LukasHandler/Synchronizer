@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Synchronizer.ApplicationLogic
@@ -16,16 +17,19 @@ namespace Synchronizer.ApplicationLogic
 
         private static Task jobTask;
 
-        private static object Locker;
+        public static object Locker;
+
+        private static bool lastJobFinished;
 
         static JobManager()
         {
             Locker = new object();
             ProcessedJobs = new List<Job>();
             Jobs = new ConcurrentQueue<Job>();
+            lastJobFinished = true;
         }
 
-        public static EventHandler<LogEventArguments> OnLog;
+        public static EventHandler OnJobsChanged;
 
         private static void WorkOnJobs()
         {
@@ -33,32 +37,49 @@ namespace Synchronizer.ApplicationLogic
 
             while (!allJobsCompleted)
             {
-                Job currentJob;
-                if (Jobs.TryDequeue(out currentJob))
+                if (lastJobFinished)
                 {
-                    currentJob.JobState = Job.JobStates.Processed;
+                    Job currentJob;
+                    bool canDequeue = false;
+
                     lock (Locker)
                     {
-                        ProcessedJobs.Add(currentJob);
+                        canDequeue = Jobs.TryDequeue(out currentJob);
                     }
-                    currentJob.Execute();
-                   
-                    lock (Locker)
+
+                    if (canDequeue)
                     {
-                        ProcessedJobs.Remove(currentJob);
+                        currentJob.JobState = Job.JobStates.Processed;
+                        lock (Locker)
+                        {
+                            ProcessedJobs.Add(currentJob);
+                        }
+
+                        lastJobFinished = false;
+                        OnJobsChanged?.Invoke(null, EventArgs.Empty);
+                        currentJob.Execute();
+                    }
+                    else
+                    {
+                        // Queue is empty
+                        allJobsCompleted = true;
                     }
                 }
                 else
                 {
-                    // Queue is empty
-                    allJobsCompleted = true;
+                    Thread.Sleep(1000);
                 }
             }
         }
 
         internal static void AddJob(Job newJob)
         {
-            Jobs.Enqueue(newJob);
+            lock (Locker)
+            {
+                Jobs.Enqueue(newJob);
+            }
+
+            OnJobsChanged?.Invoke(null, EventArgs.Empty);
 
             if (jobTask == null || jobTask.IsCompleted)
             {
@@ -76,6 +97,27 @@ namespace Synchronizer.ApplicationLogic
             else
             {
                 return false;
+            }
+        }
+
+        internal static void FinishedJobEntry(JobEntry jobEntry)
+        {
+            lock (Locker)
+            {
+                var job = ProcessedJobs.FirstOrDefault(p => p.LinkedJobs.Contains(jobEntry));
+
+                if (job != null)
+                {
+                    job.LinkedJobs.Remove(jobEntry);
+                    OnJobsChanged?.Invoke(null, EventArgs.Empty);
+                }
+
+                if (job.LinkedJobs.Count == 0)
+                {
+                    ProcessedJobs.Remove(job);
+                    lastJobFinished = true;
+                    OnJobsChanged?.Invoke(null, EventArgs.Empty);
+                }
             }
         }
     }

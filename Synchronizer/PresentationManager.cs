@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Synchronizer.Shared.EventArguments;
 using System.Collections;
 using System.IO;
+using System.Diagnostics;
 
 namespace Synchronizer.PresentationLogic
 {
@@ -16,6 +17,8 @@ namespace Synchronizer.PresentationLogic
         private ConcurrentBag<string> Logs;
 
         private ConcurrentBag<string> JobLogs;
+
+        private Process loggingProcess;
 
         private enum Menu
         {
@@ -50,8 +53,10 @@ namespace Synchronizer.PresentationLogic
 
         private int? currentSourceId;
 
-        public PresentationManager()
+        public PresentationManager(Process loggingProcess)
         {
+            this.loggingProcess = loggingProcess;
+
             this.menus = new Dictionary<string, Menu>();
             this.menus.Add("F3", Menu.Sources);
             this.menus.Add("F4", Menu.Targets);
@@ -64,14 +69,17 @@ namespace Synchronizer.PresentationLogic
             this.Logs = new ConcurrentBag<string>();
             this.JobLogs = new ConcurrentBag<string>();
 
-            JobManager.OnLog += NewJobLog;
+            JobManager.OnJobsChanged += RefreshJobs;
 
             this.currentSourceId = 0;
         }
 
-        private void NewJobLog(object sender, LogEventArguments e)
+        private void RefreshJobs(object sender, EventArgs args)
         {
-            this.JobLogs.Add(DateTime.Now.ToString("ddMMyyyy:HHmmss") + e.LogMessage);
+            if (this.currentMenu == Menu.Jobs)
+            {
+                this.ChangeMenu();
+            }
         }
 
         public void Start()
@@ -142,9 +150,20 @@ namespace Synchronizer.PresentationLogic
 
                 } while (!quit);
 
-
-
                 ApplicationManager.SaveSettings();
+
+                try
+                {
+                    if (this.loggingProcess != null && !this.loggingProcess.HasExited)
+                    {
+                        this.loggingProcess.Kill();
+                        this.loggingProcess.Dispose();
+                    }
+                }
+                catch (Exception)
+                {
+                    return;
+                }
             }
         }
 
@@ -194,7 +213,7 @@ namespace Synchronizer.PresentationLogic
                 {
                     canChange = this.ChangeToExceptions();
                 }
-                else  if (newMenu.Value == Menu.Settings)
+                else if (newMenu.Value == Menu.Settings)
                 {
                     this.PrintSettings();
                     canChange = false;
@@ -206,6 +225,7 @@ namespace Synchronizer.PresentationLogic
                 }
             }
 
+            Console.Clear();
             Console.ForegroundColor = ConsoleColor.DarkCyan;
             string separator = "_________________________";
             Console.WriteLine(separator);
@@ -505,125 +525,164 @@ namespace Synchronizer.PresentationLogic
 
         private void PrintLogs()
         {
-            var logs = ApplicationManager.GetLogs();
-            foreach (var log in logs)
-            {
-                Console.WriteLine(log);
-            }
+            //var logs = ApplicationManager.GetLogs();
+            //foreach (var log in logs)
+            //{
+            //    Console.WriteLine(log);
+            //}
         }
 
         private void PrintSettings()
         {
-            string blockCompareMinFileSize = Convert.ToString(ApplicationManager.GetBlockCompareMinFileSize());
-            string blockCompareBlockSize = Convert.ToString(ApplicationManager.GetBlockCompareBlockSize());
-            string parallelSync = Convert.ToString(ApplicationManager.GetParallelSync());
+            string blockCompareMinFileSize = Convert.ToString(ApplicationManager.Settings.BlockCompareMinFileSize);
+            string blockCompareBlockSize = Convert.ToString(ApplicationManager.Settings.BlockCompareBlockSize);
+            string parallelSync = Convert.ToString(ApplicationManager.Settings.ParallelSync);
+            string loggingFilePath = ApplicationManager.Settings.LoggingFile.FullName;
+            string loggingFileMaxSize = Convert.ToString(ApplicationManager.Settings.MaxLoggingFileSize);
 
             Console.WriteLine("The current settings are:");
             Console.WriteLine("Block compare minimal file size: " + blockCompareMinFileSize);
             Console.WriteLine("Block compare block size: " + blockCompareBlockSize);
             Console.WriteLine("Parallel synchronisation: " + parallelSync);
-
-            string input;
-            bool goodInput;
+            Console.WriteLine("Logging file: " + loggingFilePath);
+            Console.WriteLine("Logging file maximal file size: " + loggingFileMaxSize);
 
             // Get want to change value
-            do
-            {
-                Console.Write("Want to change? y/n ");
-                input = Console.ReadLine().Trim().ToLower();
-                if (input != "y" && input != "n")
-                {
-                    goodInput = false;
-                    Console.WriteLine("Invalid input. Must be \"n\" or \"y\"");
-                }
-                else
-                {
-                    goodInput = true;
-                }
+            bool wantChange;
+            GetInput<bool>(TryParseMethods.YesNoTryParse, out wantChange, "Want to change? y/n ", "Invalid input. Must be \"n\" or \"y\"");
 
-            } while (!goodInput);
-
-            long newValue = 0;
-
-            if (input == "y")
+            if (wantChange)
             {
                 // Get block compare minimal file size value
-                do
-                {
-                    Console.Write("New block compare minimal file size (empty to keep {0}): ", blockCompareMinFileSize);
-                    input = Console.ReadLine().Trim();
+                long newBlockCompareMinFileSize;
 
-                    if (input == string.Empty)
-                    {
-                        goodInput = true;
-                    }
-                    else if (Int64.TryParse(input, out newValue) && newValue > 0)
-                    {
-                        ApplicationManager.SetBlockCompareMinFileSize(newValue);
-                        goodInput = true;
-                    }
-                    else
-                    {
-                        Console.WriteLine("Error, value must be a number between 0 and " + Int64.MaxValue);
-                        goodInput = false;
-                    }
-                } while (!goodInput);
+                IsValid<long> validFileSize = delegate (long value)
+                {
+                    return value >= 0;
+                };
+
+                if (this.GetInput(
+                    long.TryParse,
+                    out newBlockCompareMinFileSize,
+                    string.Format("New block compare minimal file size (empty to keep {0}): ", blockCompareMinFileSize),
+                    string.Format("Error, value must be a number between 0 and {0}", long.MaxValue),
+                    false,
+                    true,
+                    validFileSize))
+                {
+                    ApplicationManager.Settings.BlockCompareMinFileSize = newBlockCompareMinFileSize;
+                }
 
                 // Get block compare block size value
-                int newBlockCompareSize;
-                do
+                int newBlockCompareBlockSize;
+
+                IsValid<int> validBlockSize = delegate (int value)
                 {
-                    Console.Write("New block compare block size (empty to keep {0}): ", blockCompareBlockSize);
-                    input = Console.ReadLine().Trim();
+                    return value > 0 && value != 0;
+                };
 
-                    if (input == string.Empty)
-                    {
-                        goodInput = true;
-                    }
-                    else if (Int32.TryParse(input, out newBlockCompareSize))
-                    {
-                        // Value 0 doesn't make sense for block size comparison value.
-                        if (newValue == 0)
-                        {
-                            goodInput = false;
-                        }
-                        else
-                        {
-                            ApplicationManager.SetBlockCompareBlockSize(newBlockCompareSize);
-                            goodInput = true;
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("Error, value must be a number between 1 and " + Int32.MaxValue);
-                        goodInput = false;
-                    }
-
-                } while (!goodInput);
+                if (this.GetInput(
+                    int.TryParse,
+                    out newBlockCompareBlockSize,
+                    string.Format("New block compare block size (empty to keep {0}): ", blockCompareBlockSize),
+                    string.Format("Error, value must be a number between 1 and {0}", Int32.MaxValue),
+                    false,
+                    true,
+                    validBlockSize))
+                {
+                    ApplicationManager.Settings.BlockCompareBlockSize = newBlockCompareBlockSize;
+                }
 
                 // Get parallel sync value
-                bool newParallelSyncValue = false;
-                do
+                bool newParallelSyncValue;
+
+                if (this.GetInput(
+                    bool.TryParse,
+                    out newParallelSyncValue,
+                    string.Format("New parallel synchronisation (empty to keep {0}): ", parallelSync),
+                    "Error, value must be a \"true\" or \"false\"",
+                    false,
+                    true))
                 {
-                    Console.Write("New block compare block size (empty to keep {0}): ", parallelSync);
-                    input = Console.ReadLine().Trim();
+                    ApplicationManager.Settings.ParallelSync = newParallelSyncValue;
+                }
 
-                    if (input == string.Empty)
-                    {
-                        goodInput = true;
-                    }
-                    else if (Boolean.TryParse(input, out newParallelSyncValue))
-                    {
-                        ApplicationManager.SetParallelSync(newParallelSyncValue);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Error, value must be a \"true\" or \"false\"");
-                        goodInput = false;
-                    }
+                // Get logging file path
+                FileInfo newloggingFilePath;
 
-                } while (!goodInput);
+                if (this.GetInput(
+                    TryParseMethods.FileInfoTryParse,
+                    out newloggingFilePath,
+                    string.Format("New logging file (empty to keep {0}): ", loggingFilePath),
+                    "Error, path must be a valid file",
+                    false,
+                    true))
+                {
+                    ApplicationManager.Settings.LoggingFile = newloggingFilePath;
+                }
+
+                // Get logging file size
+                long newMaxLoggingFileSize;
+
+
+                IsValid<long> validLoggingFileSize = delegate (long value)
+                {
+                    return value > 0;
+                };
+
+                if (this.GetInput(
+                    long.TryParse,
+                    out newMaxLoggingFileSize,
+                    string.Format("New logging file maximal file size (empty to keep {0}): ", loggingFileMaxSize),
+                    string.Format("Error, value must be a number between 1 and {0}", long.MaxValue),
+                    false,
+                    true,
+                    validLoggingFileSize))
+                {
+                    ApplicationManager.Settings.MaxLoggingFileSize = newMaxLoggingFileSize;
+                }
             }
+        }
+
+        delegate bool TryParse<T>(string str, out T value);
+
+        delegate bool IsValid<T>(T value);
+
+        private bool GetInput<T>(TryParse<T> parseFunction, out T value, string inputMessage, string errorMessage, bool exitAllowed = false, bool emptyAllowed = false, IsValid<T> isValid = null)
+        {
+            // http://stackoverflow.com/questions/10574504/how-to-use-t-tryparse-in-a-generic-method-while-t-is-either-double-or-int
+            value = default(T);
+
+            bool canParse;
+            do
+            {
+                Console.Write(inputMessage);
+                string input = Console.ReadLine().Trim().ToLower();
+
+                if ((exitAllowed && input == "exit") ||
+                    (emptyAllowed && input == string.Empty))
+                {
+                    return false;
+                }
+
+                canParse = parseFunction(input, out value);
+
+                if (canParse && isValid != null)
+                {
+                    if (!isValid(value))
+                    {
+                        canParse = false;
+                    }
+                }
+
+                if (!canParse)
+                {
+                    Console.WriteLine(errorMessage);
+                }
+
+            } while (!canParse);
+
+            return true;
         }
 
         private void PrintListWithIndex(List<string> values)
@@ -643,72 +702,68 @@ namespace Synchronizer.PresentationLogic
 
         private bool AddPath(PathOperation operation)
         {
-            string path;
-            bool isValid = false;
+            string information = string.Empty;
 
-            do
+            switch (operation)
             {
-                string information = string.Empty;
+                case PathOperation.Source:
+                    information = "sources";
+                    break;
+                case PathOperation.Target:
+                    information = "targets";
+                    break;
+                case PathOperation.Exception:
+                    information = "exceptions";
+                    break;
+                default:
+                    break;
+            }
+
+            DirectoryInfo newDirectory;
+
+            IsValid<DirectoryInfo> isValid = delegate (DirectoryInfo value)
+            {
+                string errorMessage = string.Empty;
 
                 switch (operation)
                 {
                     case PathOperation.Source:
-                        information = "sources";
+                        errorMessage = ApplicationManager.AddSource(value.FullName);
                         break;
                     case PathOperation.Target:
-                        information = "targets";
+                        errorMessage = ApplicationManager.AddTarget(this.currentSourceId.Value, value.FullName);
                         break;
                     case PathOperation.Exception:
-                        information = "exceptions";
-                        break;
-                    default:
+                        errorMessage = ApplicationManager.AddException(this.currentSourceId.Value, value.FullName);
                         break;
                 }
 
-                Console.Write("Enter path for new {0} (\"exit\" to cancel): ", information);
-                string input = Console.ReadLine();
-
-                if (input == "exit")
+                if (errorMessage != null)
                 {
+                    Console.WriteLine("Couldn't add {0}:\r\n{1}", operation.ToString(), errorMessage);
                     return false;
-                }
-
-                path = PathHelper.ChangePathToDefaultPath(input);
-
-                if (!Directory.Exists(path))
-                {
-                    Console.WriteLine("Error. Not a valid path.");
                 }
                 else
                 {
-                    string errorMessage = null;
-
-                    switch (operation)
-                    {
-                        case PathOperation.Source:
-                            errorMessage = ApplicationManager.AddSource(path);
-                            break;
-                        case PathOperation.Target:
-                            errorMessage = ApplicationManager.AddTarget(this.currentSourceId.Value, path);
-                            break;
-                        case PathOperation.Exception:
-                            errorMessage = ApplicationManager.AddException(this.currentSourceId.Value, path);
-                            break;
-                    }
-
-                    if (errorMessage != null)
-                    {
-                        isValid = false;
-                        Console.WriteLine("Couldn't add {0}:\r\n{1}", operation.ToString(), errorMessage);
-                    }
-                    else
-                    {
-                        isValid = true;
-                    }
+                    return true;
                 }
-            } while (!isValid);
+            };
 
-            return true;
+            if (this.GetInput(
+                TryParseMethods.DirectoryInfoTryParse,
+                out newDirectory,
+                string.Format("Enter path for new {0} (\"exit\" to cancel): ", operation.ToString()),
+                "Error, not a valid path",
+                true,
+                false,
+                isValid))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
 }

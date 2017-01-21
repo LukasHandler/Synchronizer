@@ -1,6 +1,7 @@
 ﻿using Synchronizer.Shared.EventArguments;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,21 +12,17 @@ namespace Synchronizer.ApplicationLogic
     {
         private static List<SourceFileDirectory> sourceDirectories;
 
-        internal static Settings Settings;
-
-        private static List<string> logs;
+        public static Settings Settings;
 
         static ApplicationManager()
         {
-            logs = new List<string>();
-
             try
             {
                 sourceDirectories = Serializer.DeSerializeObject<List<SourceFileDirectory>>("SourceDirectories.save");
             }
             catch (Exception exception)
             {
-                Log("Couldn't load SourceDirectories.save: " + exception.Message);
+                LoggingManager.Log("Couldn't load SourceDirectories.save: " + exception.Message);
                 sourceDirectories = new List<SourceFileDirectory>();
             }
 
@@ -35,7 +32,7 @@ namespace Synchronizer.ApplicationLogic
             }
             catch (Exception exception)
             {
-                Log("Couldn't load Settings.save: " + exception.Message);
+                LoggingManager.Log("Couldn't load Settings.save: " + exception.Message);
                 Settings = new Settings();
             }
         }
@@ -53,7 +50,7 @@ namespace Synchronizer.ApplicationLogic
             }
             catch (Exception exception)
             {
-                Log("Couldn't create SourceDirectories.save: " + exception.Message);
+                LoggingManager.Log("Couldn't create SourceDirectories.save: " + exception.Message);
             }
 
             try
@@ -62,7 +59,7 @@ namespace Synchronizer.ApplicationLogic
             }
             catch (Exception exception)
             {
-                Log("Couldn't create Settings.save: " + exception.Message);
+                LoggingManager.Log("Couldn't create Settings.save: " + exception.Message);
             }
         }
 
@@ -105,7 +102,7 @@ namespace Synchronizer.ApplicationLogic
 
             if (string.IsNullOrEmpty(errorMessage))
             {
-                sourceDirectories[sourceId].Targets.Add(newTarget);
+                sourceDirectories[sourceId].AddTarget(newTarget);
             }
 
             return errorMessage;
@@ -152,47 +149,20 @@ namespace Synchronizer.ApplicationLogic
 
         public static List<string> GetJobs()
         {
-            return JobManager.ProcessedJobs.Select(p => p.ToString()).Concat(JobManager.Jobs.Select(p => p.ToString())).ToList();
-        }
+            List<string> jobs;
+            lock (JobManager.Locker)
+            {
+                jobs = JobManager.ProcessedJobs.Select(p => p.ToString()).Concat(JobManager.Jobs.Select(p => p.ToString())).ToList();
+            }
 
-        public static List<string> GetLogs()
-        {
-            return logs;
-        }
-
-        public static long GetBlockCompareMinFileSize()
-        {
-            return Settings.BlockCompareMinFileSize;
-        }
-
-        public static void SetBlockCompareMinFileSize(long value)
-        {
-            Settings.BlockCompareMinFileSize = value;
-        }
-
-        public static int GetBlockCompareBlockSize()
-        {
-            return Settings.BlockCompareBlockSize;
-        }
-
-        public static void SetBlockCompareBlockSize(int value)
-        {
-            Settings.BlockCompareBlockSize = value;
-        }
-
-        public static bool GetParallelSync()
-        {
-            return Settings.ParallelSync;
-        }
-
-        public static void SetParallelSync(bool value)
-        {
-            Settings.ParallelSync = value;
-        }
-
-        private static void Log(string message)
-        {
-            logs.Add(DateTime.Now.ToString("dd.MM.yyyy-HH:mm:ss:FF") + " " + message);
+            if (jobs.Count == 0)
+            {
+                return new List<string>() { "No jobs" };
+            }
+            else
+            {
+                return jobs;
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,20 +20,13 @@ namespace Synchronizer.ApplicationLogic
         /// <param name="fileName"></param>
         public static void SerializeObject<T>(T serializableObject, string fileName)
         {
-            if (serializableObject == null) { return; }
-
-            XmlDocument xmlDocument = new XmlDocument();
-
-            // http://stackoverflow.com/questions/1127431/xmlserializer-giving-filenotfoundexception-at-constructor
-            XmlSerializer serializer = XmlSerializer.FromTypes(new[] { typeof(T) })[0];
-            using (MemoryStream stream = new MemoryStream())
+            if (serializableObject == null)
             {
-                serializer.Serialize(stream, serializableObject);
-                stream.Position = 0;
-                xmlDocument.Load(stream);
-                xmlDocument.Save(fileName);
-                stream.Close();
+                return;
             }
+
+            string serialized = JsonConvert.SerializeObject(serializableObject);
+            File.WriteAllText(fileName, serialized);
         }
 
 
@@ -44,43 +38,24 @@ namespace Synchronizer.ApplicationLogic
         /// <returns></returns>
         public static T DeSerializeObject<T>(string fileName)
         {
-            if (string.IsNullOrEmpty(fileName)) { return default(T); }
-
-            T objectOut = default(T);
-
-            XmlDocument xmlDocument = new XmlDocument();
-            xmlDocument.Load(fileName);
-            string xmlString = xmlDocument.OuterXml;
-
-            using (StringReader read = new StringReader(xmlString))
+            if (string.IsNullOrEmpty(fileName))
             {
-                Type outType = typeof(T);
-
-                XmlSerializer serializer = XmlSerializer.FromTypes(new[] { outType })[0];
-                using (XmlReader reader = new XmlTextReader(read))
-                {
-                    objectOut = (T)serializer.Deserialize(reader);
-                    reader.Close();
-                }
-
-                read.Close();
+                return default(T);
             }
-            return objectOut;
+
+            string serialized = File.ReadAllText(fileName);
+            return JsonConvert.DeserializeObject<T>(serialized);
         }
 
         public static T CopyObject<T>(T objectToCopy)
         {
-            XmlSerializer serializer = XmlSerializer.FromTypes(new[] { typeof(T) })[0];
-            T result;
-
-            using (MemoryStream stream = new MemoryStream())
+            if (objectToCopy == null)
             {
-                serializer.Serialize(stream, objectToCopy);
-                stream.Position = 0;
-                result = (T)serializer.Deserialize(stream);
+                return default(T);
             }
 
-            return result;
+            string serialized = JsonConvert.SerializeObject(objectToCopy);
+            return JsonConvert.DeserializeObject<T>(serialized);
         }
     }
 }

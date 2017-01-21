@@ -16,11 +16,6 @@ namespace Synchronizer.ApplicationLogic
             this.Path = path;
         }
 
-        protected FileDirectory()
-        {
-
-        }
-
         public override string ToString()
         {
             return this.Path;

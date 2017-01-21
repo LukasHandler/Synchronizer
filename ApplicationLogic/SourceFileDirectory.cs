@@ -18,7 +18,11 @@ namespace Synchronizer.ApplicationLogic
         {
             this.Targets = new List<FileDirectory>();
             this.Exceptions = new List<FileDirectory>();
-            InitWatcher();
+
+            if (!string.IsNullOrEmpty(this.Path))
+            {
+                InitWatcher();
+            }
         }
 
         public void InitWatcher()
@@ -45,7 +49,7 @@ namespace Synchronizer.ApplicationLogic
 
                     FileInfo oldFile = null;
 
-                    if (canSynchronize)
+                    if (canSynchronize && ApplicationManager.Settings.ParallelSync)
                     {
                         List<JobEntry> jobEntries = new List<JobEntry>();
 
@@ -108,11 +112,6 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
-        private SourceFileDirectory()
-        {
-
-        }
-
         public void InitialSynchronization()
         {
             var directoryPath = PathHelper.ChangePathToDefaultPath(this.Path);
@@ -144,15 +143,16 @@ namespace Synchronizer.ApplicationLogic
             // If directory is not an exception or a subdirectory of an exception, copy directory
             if (!this.Exceptions.Any(p => PathHelper.IsSamePath(p.Path, directoryPath) || PathHelper.IsSubDirectoryOfPath(directoryPath, p.Path)))
             {
-                // Create folder in target
+                // Get the target directory
                 var target = this.Targets.FirstOrDefault(p => PathHelper.IsSamePath(p.Path, targetDirectory) || PathHelper.IsSubDirectoryOfPath(targetDirectory, p.Path));
 
                 if (target == null)
                 {
                     return;
                 }
-                targetDirectory = PathHelper.ChangePathToDefaultPath(target.Path);
 
+                // Create folder in target
+                targetDirectory = PathHelper.ChangePathToDefaultPath(target.Path);
                 string targetDirectoryPath = System.IO.Path.Combine(targetDirectory, pathWithoutSource);
                 if (!Directory.Exists(targetDirectoryPath))
                 {
@@ -165,56 +165,20 @@ namespace Synchronizer.ApplicationLogic
                 {
                     var filePath = PathHelper.ChangePathToDefaultPath(file, true);
                     string filePathWithoutSource = filePath.Substring(this.Path.Count());
-
                     string targetFilePath = System.IO.Path.Combine(targetDirectory, filePathWithoutSource);
-                    if (!File.Exists(targetFilePath))
-                    {
-                        JobEntry newJobEntry = new JobEntry(this, new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null, true);
-                        Job newJob = new Job(newJobEntry);
-                        JobManager.AddJob(newJob);
-                    }
+
+                    JobEntry newJobEntry = new JobEntry(this, new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null, true);
+                    Job newJob = new Job(newJobEntry);
+                    JobManager.AddJob(newJob);
                 }
             }
         }
 
-        //private void SynchronizeDirectory(string directoryPath)
-        //{
-        //    string pathWithoutSource = directoryPath.Substring(this.Path.Count());
-
-        //    // If directory is not an exception or a subdirectory of an exception, copy directory
-        //    if (!this.Exceptions.Any(p => PathHelper.IsSamePath(p.Path, directoryPath) || PathHelper.IsSubDirectoryOfPath(directoryPath, p.Path)))
-        //    {
-        //        // Create folder in target
-        //        foreach (var target in this.Targets)
-        //        {
-        //            string targetDirectoryPath = System.IO.Path.Combine(target.Path, pathWithoutSource);
-        //            if (!Directory.Exists(targetDirectoryPath))
-        //            {
-        //                JobEntry newJobEntry = new JobEntry(this, new FileInfo(directoryPath), new FileInfo(targetDirectoryPath), WatcherChangeTypes.Created, true, null);
-        //                Job newJob = new Job(newJobEntry);
-        //                JobManager.AddJob(newJob);
-        //            }
-        //        }
-
-        //        foreach (var file in Directory.GetFiles(directoryPath))
-        //        {
-        //            var filePath = PathHelper.ChangePathToDefaultPath(file, true);
-        //            string filePathWithoutSource = filePath.Substring(this.Path.Count());
-
-        //            // Create file in target
-        //            foreach (var target in this.Targets)
-        //            {
-        //                string targetFilePath = System.IO.Path.Combine(target.Path, filePathWithoutSource);
-        //                if (!File.Exists(targetFilePath))
-        //                {
-        //                    JobEntry newJobEntry = new JobEntry(this, new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null);
-        //                    Job newJob = new Job(newJobEntry);
-        //                    JobManager.AddJob(newJob);
-        //                }
-        //            }
-        //        }
-        //    }
-        //}
+        public void AddTarget(FileDirectory target)
+        {
+            this.Targets.Add(target);
+            this.SynchronizeDirectoryFilesRecursiveToTarget(target.Path, this.Path);
+        }
 
         public override string ToString()
         {

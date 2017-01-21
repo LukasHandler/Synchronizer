@@ -79,8 +79,17 @@ namespace Synchronizer.ApplicationLogic
 
             foreach (var path in pathes)
             {
-                string logicalName = GetLogicalDriveName(path);
-                
+                string logicalName = string.Empty;
+
+                if (path.StartsWith("\\\\"))
+                {
+                    return false;
+                }
+                else
+                {
+                    logicalName = GetLogicalDriveName(path);
+                }
+
                 if (string.IsNullOrEmpty(logicalName))
                 {
                     return false;

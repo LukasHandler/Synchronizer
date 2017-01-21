@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{664A8F97-2952-4E63-88C8-57E9C3DE1707}</ProjectGuid>
+    <ProjectGuid>{5CA32099-68D9-41FA-9998-AE92CBD1B3F4}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Synchronizer.PresentationLogic</RootNamespace>
-    <AssemblyName>Synchronizer.PresentationLogic</AssemblyName>
+    <RootNamespace>LogPresentationLogic</RootNamespace>
+    <AssemblyName>LogPresentationLogic</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -43,28 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="TryParseMethods.cs" />
-    <Compile Include="PathValidator.cs" />
-    <Compile Include="PresentationManager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\ApplicationLogic\ApplicationLogic.csproj">
-      <Project>{ee4edb29-bede-422f-9e30-00a00c0256c9}</Project>
-      <Name>ApplicationLogic</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\LogPresentationLogic\LogPresentationLogic.csproj">
-      <Project>{5ca32099-68d9-41fa-9998-ae92cbd1b3f4}</Project>
-      <Name>LogPresentationLogic</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Shared\Shared.csproj">
-      <Project>{76b98587-9046-4079-8783-ab8ab73fef4e}</Project>
-      <Name>Shared</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,6 +15,8 @@ namespace Synchronizer.ApplicationLogic
             this.BlockCompareMinFileSize = 1024;
             this.BlockCompareBlockSize = 100;
             this.ParallelSync = true;
+            this.LoggingFile = new FileInfo("Logs.txt");
+            this.MaxLoggingFileSize = 1024;
         }
 
         /// <summary>
@@ -31,6 +34,22 @@ namespace Synchronizer.ApplicationLogic
         /// The size of the block compare block.
         /// </value>
         public int BlockCompareBlockSize { get; set; }
+
+        /// <summary>
+        /// Gets or sets the logging file.
+        /// </summary>
+        /// <value>
+        /// The logging file.
+        /// </value>
+        public FileInfo LoggingFile { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum size of the logging file.
+        /// </summary>
+        /// <value>
+        /// The maximum size of the logging file.
+        /// </value>
+        public long MaxLoggingFileSize { get; set; }
 
         public bool ParallelSync { get; set; }
 
