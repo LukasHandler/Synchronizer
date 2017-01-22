@@ -112,7 +112,7 @@ namespace Synchronizer.ApplicationLogic
         }
 
         // Validate whole structure.
-        public static string IsValid(List<SourceFileDirectory> sourceDirectories, bool onStart = false)
+        public static string IsValid(List<SourceFileDirectory> sourceDirectories)
         {
             // Validate all pathes and change the layout.
             foreach (var source in sourceDirectories)
@@ -154,11 +154,6 @@ namespace Synchronizer.ApplicationLogic
                     {
                         exception.Path = ChangePathToDefaultPath(exception.Path);
                     }
-                }
-
-                if (onStart)
-                {
-                    source.InitWatcher();
                 }
             }
 
@@ -228,12 +223,6 @@ namespace Synchronizer.ApplicationLogic
                     var conflictExceptionIndex = source.Exceptions.FindIndex(p => p == conflictException);
                     return string.Format("The source {0} {1} has a conflict with exception {2} {3}", conflictExceptionIndex, conflictException.Path);
                 }
-            }
-
-            // Synchronize sources
-            foreach (var sourceDirectory in sourceDirectories)
-            {
-                sourceDirectory.InitialSynchronization();
             }
 
             return null;

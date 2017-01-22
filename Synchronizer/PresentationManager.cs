@@ -84,25 +84,37 @@ namespace Synchronizer.PresentationLogic
 
             if (!validArguments)
             {
-                ApplicationManager.LoadSaveFiles();
+                string errorMessage = ApplicationManager.LoadSaveFiles();
+
+                if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    Console.WriteLine(errorMessage);
+                    Console.WriteLine("Change and restart application. You can also delete the *.save files to create a new structure. Program will close");
+                    Console.ReadLine();
+                    return;
+                }
             }
+
+            ApplicationManager.InitialSynchronization();
+            Start();
         }
 
         private bool ValidateArguments(string[] args)
         {
-            string helpMessage = string.Format(
-                @"Help for synchronizer application:\r\n" +
-                "The order matters\r\n" +
-                "-s source1;recursive;target1,target2,...;exception1,exception2,...;source2;...\r\n" +
-                "-l logFile\r\n" +
-                "-ls logFileSize\r\n" +
-                "-mbf minimalBlockFileSize\r\n" +
-                "-bs blockSize\r\n" +
-                "-p parallelSynchronization\r\n\r\n" +
-                "or -h for help\r\n\r\n" +
-                "For example:\r\n" +
-                "-q d:\test;true;d:\test2,c:\test; -l Logs.txt -ls 10 -mbfs 10 -bs 10 -p true"
-                );
+            string helpMessage = 
+                "Help for synchronizer application:{0}" +
+                "The order matters{0}" +
+                "-s source1;recursive;target1,target2,...;exception1,exception2,...|source2;...{0}" +
+                "-l logFile{0}" +
+                "-ls logFileSize{0}" +
+                "-mbf minimalBlockFileSize{0}" +
+                "-bs blockSize{0}" +
+                "-p parallelSynchronization{0}{0}" +
+                "or -h for help{0}{0}" +
+                "For example:{0}" +
+                @"-q d:\test;true;d:\test2,c:\test; -l Logs.txt -ls 10 -mbfs 10 -bs 10 -p true";
+
+            helpMessage = string.Format(helpMessage, Environment.NewLine);
 
             // Ignore if there are no arguments
             if (args == null || args.Length == 0)
@@ -165,6 +177,61 @@ namespace Synchronizer.PresentationLogic
                 Console.WriteLine("Error, wrong order");
                 return false;
             }
+
+            // Validate logfile
+            FileInfo loggingFile;
+
+            if (!ValidationMethods.FileInfoTryParse(args[3], out loggingFile))
+            {
+                Console.WriteLine("Error, {0} is not a valid directory path", args[3]);
+                return false;
+            }
+
+            ApplicationManager.Settings.LoggingFile = loggingFile;
+
+            // Validate log file size
+            long logFileSize;
+
+            if (!long.TryParse(args[5], out logFileSize) || !ValidationMethods.IsValidLoggingFileSize(logFileSize))
+            {
+                Console.WriteLine("Error, {0} is not a valid logging file size", args[5]);
+                return false;
+            }
+
+            ApplicationManager.Settings.MaxLoggingFileSize = logFileSize;
+
+            // Validate minimal block file size
+            long minimalBlockFileSize;
+
+            if (!long.TryParse(args[7], out minimalBlockFileSize) || !ValidationMethods.IsValidFileSize(minimalBlockFileSize))
+            {
+                Console.WriteLine("Error, {0} is not a valid minimal block file size", args[7]);
+                return false;
+            }
+
+            ApplicationManager.Settings.BlockCompareMinFileSize = minimalBlockFileSize;
+
+            // Validate block size
+            int blockSize;
+
+            if (!int.TryParse(args[9], out blockSize) || !ValidationMethods.IsValidBlockSize(blockSize))
+            {
+                Console.WriteLine("Error, {0} is not a valid block size", args[9]);
+                return false;
+            }
+
+            ApplicationManager.Settings.BlockCompareBlockSize = blockSize;
+
+            // Validate parallel sync
+            bool parallelSync;
+            if (!bool.TryParse(args[11], out parallelSync))
+            {
+                Console.WriteLine("Error, {0} is not a valid parallel synchronization value", args[11]);
+                return false;
+            }
+
+            ApplicationManager.Settings.ParallelSync = parallelSync;
+
             // Validate sources
             string[] sources = args[1].Split('|');
             int i = 0;
@@ -235,7 +302,7 @@ namespace Synchronizer.PresentationLogic
                                 return false;
                             }
 
-                            string errorMessage = ApplicationManager.AddTarget(i, directory.FullName);
+                            string errorMessage = ApplicationManager.AddTarget(i, directory.FullName, false);
                             if (!string.IsNullOrEmpty(errorMessage))
                             {
                                 Console.WriteLine("Error, couldn't create target {0} because: \r\n{1}", target, errorMessage);
@@ -278,59 +345,6 @@ namespace Synchronizer.PresentationLogic
                 i++;
             }
 
-            // Validate logfile
-            FileInfo loggingFile;
-
-            if (!ValidationMethods.FileInfoTryParse(args[3], out loggingFile))
-            {
-                Console.WriteLine("Error, {0} is not a valid directory path", args[3]);
-                return false;
-            }
-
-            ApplicationManager.Settings.LoggingFile = loggingFile;
-
-            // Validate log file size
-            long logFileSize;
-
-            if (!long.TryParse(args[5], out logFileSize) || !ValidationMethods.IsValidLoggingFileSize(logFileSize))
-            {
-                Console.WriteLine("Error, {0} is not a valid logging file size", args[5]);
-                return false;
-            }
-
-            ApplicationManager.Settings.MaxLoggingFileSize = logFileSize;
-
-            // Validate minimal block file size
-            long minimalBlockFileSize;
-
-            if (!long.TryParse(args[7], out minimalBlockFileSize) || !ValidationMethods.IsValidFileSize(minimalBlockFileSize))
-            {
-                Console.WriteLine("Error, {0} is not a valid minimal block file size", args[7]);
-                return false;
-            }
-
-            ApplicationManager.Settings.BlockCompareMinFileSize = minimalBlockFileSize;
-
-            // Validate block size
-            int blockSize;
-
-            if (!int.TryParse(args[9], out blockSize) || !ValidationMethods.IsValidBlockSize(blockSize))
-            {
-                Console.WriteLine("Error, {0} is not a valid block size", args[9]);
-                return false;
-            }
-
-            ApplicationManager.Settings.BlockCompareBlockSize = blockSize;
-
-            // Validate parallel sync
-            bool parallelSync;
-            if (!bool.TryParse(args[11], out parallelSync))
-            {
-                Console.WriteLine("Error, {0} is not a valid parallel synchronization value", args[11]);
-                return false;
-            }
-
-            ApplicationManager.Settings.ParallelSync = parallelSync;
             return true;
         }
 
@@ -342,88 +356,76 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
-        public void Start()
+        private void Start()
         {
-            // Validate if the input files are okay.
-            string errorMessage = ApplicationManager.ValidateData();
+            ConsoleKey pressedKey;
+            ChangeMenu(Menu.Sources);
+            bool quit = false;
 
-            if (!string.IsNullOrEmpty(errorMessage))
+            do
             {
-                Console.WriteLine(errorMessage);
-                Console.WriteLine("Change and restart application. You can also delete the *.save files to create a new structure. Program will close");
-                Console.ReadLine();
-            }
-            else
-            {
-                ConsoleKey pressedKey;
-                ChangeMenu(Menu.Sources);
-                bool quit = false;
+                pressedKey = Console.ReadKey().Key;
+                Console.SetCursorPosition(0, Console.CursorTop);
+                Console.Write(" ");
+                Console.SetCursorPosition(0, Console.CursorTop);
 
-                do
+                if (this.menus.ContainsKey(pressedKey.ToString()))
                 {
-                    pressedKey = Console.ReadKey().Key;
-                    Console.SetCursorPosition(0, Console.CursorTop);
-                    Console.Write(" ");
-                    Console.SetCursorPosition(0, Console.CursorTop);
+                    this.ChangeMenu(this.menus[pressedKey.ToString()]);
+                }
 
-                    if (this.menus.ContainsKey(pressedKey.ToString()))
-                    {
-                        this.ChangeMenu(this.menus[pressedKey.ToString()]);
-                    }
-
-                    switch (pressedKey)
-                    {
-                        case ConsoleKey.A:
-                            switch (currentMenu)
-                            {
-                                case Menu.Sources:
-                                    AddSource();
-                                    break;
-                                case Menu.Targets:
-                                    AddTarget();
-                                    break;
-                                case Menu.Exceptions:
-                                    AddException();
-                                    break;
-                            }
-                            break;
-                        case ConsoleKey.D:
-                            switch (currentMenu)
-                            {
-                                case Menu.Sources:
-                                    DeleteSource();
-                                    break;
-                                case Menu.Targets:
-                                    DeleteTarget();
-                                    break;
-                                case Menu.Exceptions:
-                                    DeleteException();
-                                    break;
-                            }
-                            break;
-                        case ConsoleKey.Escape:
-                            {
-                                quit = CanEscape();
+                switch (pressedKey)
+                {
+                    case ConsoleKey.A:
+                        switch (currentMenu)
+                        {
+                            case Menu.Sources:
+                                AddSource();
                                 break;
-                            }
-                    }
-
-                } while (!quit);
-
-                ApplicationManager.SaveSettings();
-
-                try
-                {
-                    if (this.loggingProcess != null && !this.loggingProcess.HasExited)
-                    {
-                        this.loggingProcess.Kill();
-                        this.loggingProcess.Dispose();
-                    }
+                            case Menu.Targets:
+                                AddTarget();
+                                break;
+                            case Menu.Exceptions:
+                                AddException();
+                                break;
+                        }
+                        break;
+                    case ConsoleKey.D:
+                        switch (currentMenu)
+                        {
+                            case Menu.Sources:
+                                DeleteSource();
+                                break;
+                            case Menu.Targets:
+                                DeleteTarget();
+                                break;
+                            case Menu.Exceptions:
+                                DeleteException();
+                                break;
+                        }
+                        break;
+                    case ConsoleKey.Escape:
+                        {
+                            quit = CanEscape();
+                            break;
+                        }
                 }
-                catch (Exception)
+
+            } while (!quit);
+
+            ApplicationManager.SaveSettings();
+
+            try
+            {
+                if (this.loggingProcess != null && !this.loggingProcess.HasExited)
                 {
-                    return;
+                    this.loggingProcess.Kill();
+                    this.loggingProcess.Dispose();
                 }
+            }
+            catch (Exception)
+            {
+                return;
             }
         }
 

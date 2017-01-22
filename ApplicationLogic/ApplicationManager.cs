@@ -19,7 +19,7 @@ namespace Synchronizer.ApplicationLogic
             Settings = new Settings();
         }
 
-        public static void LoadSaveFiles()
+        public static string LoadSaveFiles()
         {
             try
             {
@@ -40,11 +40,17 @@ namespace Synchronizer.ApplicationLogic
                 LoggingManager.Log("Couldn't load Settings.save: " + exception.Message);
                 Settings = new Settings();
             }
+
+            return PathHelper.IsValid(sourceDirectories);
         }
 
-        public static string ValidateData()
+        public static void InitialSynchronization()
         {
-            return PathHelper.IsValid(sourceDirectories, true);
+            foreach (var source in sourceDirectories)
+            {
+                source.InitWatcher();
+                source.InitialSynchronization();
+            }
         }
 
         public static void SaveSettings()
@@ -90,7 +96,9 @@ namespace Synchronizer.ApplicationLogic
 
         public static void DeleteSource(int sourceId)
         {
-            sourceDirectories.RemoveAt(sourceId);
+            var sourceToDelete = sourceDirectories.ElementAt(sourceId);
+            sourceToDelete.Dispose();
+            sourceDirectories.Remove(sourceToDelete);
         }
 
         public static List<string> GetTargets(int sourceId)
@@ -98,16 +106,16 @@ namespace Synchronizer.ApplicationLogic
             return sourceDirectories[sourceId].Targets.Select(p => p.ToString()).ToList();
         }
 
-        public static string AddTarget(int sourceId, string path)
+        public static string AddTarget(int sourceId, string path, bool startSynchronization = true)
         {
             var newTarget = new FileDirectory(path);
             var newDirectories = Serializer.CopyObject(sourceDirectories);
-            newDirectories[sourceId].Targets.Add(newTarget);
+            newDirectories[sourceId].AddTarget(newTarget);
             var errorMessage = PathHelper.IsValid(newDirectories);
 
             if (string.IsNullOrEmpty(errorMessage))
             {
-                sourceDirectories[sourceId].AddTarget(newTarget);
+                sourceDirectories[sourceId].AddTarget(newTarget, startSynchronization);
             }
 
             return errorMessage;

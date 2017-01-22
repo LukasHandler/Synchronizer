@@ -14,26 +14,28 @@ namespace Synchronizer.ApplicationLogic
 
         public List<FileDirectory> Exceptions { get; set; }
 
+        [NonSerialized()]
+        private FileSystemWatcher watcher;
+
         public SourceFileDirectory(string directoryPath, bool recursive) : base(directoryPath)
         {
             this.Targets = new List<FileDirectory>();
             this.Exceptions = new List<FileDirectory>();
-
-            if (!string.IsNullOrEmpty(this.Path))
-            {
-                InitWatcher();
-            }
+            this.InitWatcher();
         }
 
         public void InitWatcher()
         {
-            var watcher = new FileSystemWatcher(this.Path);
-            watcher.Created += CreateJob;
-            watcher.Changed += CreateJob;
-            watcher.Deleted += CreateJob;
-            watcher.Renamed += CreateJob;
-            watcher.IncludeSubdirectories = true;
-            watcher.EnableRaisingEvents = true;
+            if (watcher == null && !string.IsNullOrEmpty(this.Path))
+            {
+                watcher = new FileSystemWatcher(this.Path);
+                watcher.Created += CreateJob;
+                watcher.Changed += CreateJob;
+                watcher.Deleted += CreateJob;
+                watcher.Renamed += CreateJob;
+                watcher.IncludeSubdirectories = true;
+                watcher.EnableRaisingEvents = true;
+            }
         }
 
         private void CreateJob(object sender, FileSystemEventArgs eventArgs)
@@ -115,69 +117,115 @@ namespace Synchronizer.ApplicationLogic
         public void InitialSynchronization()
         {
             var directoryPath = PathHelper.ChangePathToDefaultPath(this.Path);
-
-            foreach (var target in this.Targets)
-            {
-                SynchronizeDirectoryFilesRecursiveToTarget(target.Path, this.Path);
-            }
+            this.SynchronizeDirectoryFilesRecursiveToTarget(directoryPath);
         }
 
-        public void SynchronizeDirectoryFilesRecursiveToTarget(string targetDirectory, string sourceDirectory)
+        public void SynchronizeDirectoryFilesRecursiveToTarget(string sourceDirectory, string targetDirectory = null)
         {
             sourceDirectory = PathHelper.ChangePathToDefaultPath(sourceDirectory);
-            targetDirectory = PathHelper.ChangePathToDefaultPath(targetDirectory);
             var directories = Directory.GetDirectories(sourceDirectory, "*.*", SearchOption.AllDirectories);
 
-            SynchronizeDirectory(sourceDirectory, targetDirectory);
-
-            foreach (var directory in directories)
+            if (targetDirectory != null)
             {
-                SynchronizeDirectory(directory, targetDirectory);
+                targetDirectory = PathHelper.ChangePathToDefaultPath(targetDirectory);
             }
+
+            SynchronizeDirectory(sourceDirectory, targetDirectory);
+            directories.ToList().ForEach(p => this.SynchronizeDirectory(p, targetDirectory));
         }
 
-        private void SynchronizeDirectory(string directoryPath, string targetDirectory)
+        private void SynchronizeDirectory(string sourceDirectory, string targetDirectory = null)
         {
-            string pathWithoutSource = directoryPath.Substring(this.Path.Count());
+            string pathWithoutSource = sourceDirectory.Substring(this.Path.Count());
 
             // If directory is not an exception or a subdirectory of an exception, copy directory
-            if (!this.Exceptions.Any(p => PathHelper.IsSamePath(p.Path, directoryPath) || PathHelper.IsSubDirectoryOfPath(directoryPath, p.Path)))
+            if (!this.Exceptions.Any(p => PathHelper.IsSamePath(p.Path, sourceDirectory) || PathHelper.IsSubDirectoryOfPath(sourceDirectory, p.Path)))
             {
                 // Get the target directory
-                var target = this.Targets.FirstOrDefault(p => PathHelper.IsSamePath(p.Path, targetDirectory) || PathHelper.IsSubDirectoryOfPath(targetDirectory, p.Path));
-
-                if (target == null)
+                if (targetDirectory != null)
                 {
-                    return;
+                    var realTarget = this.Targets.FirstOrDefault(p => PathHelper.IsSamePath(p.Path, targetDirectory) || PathHelper.IsSubDirectoryOfPath(targetDirectory, p.Path));
+                    if (realTarget == null)
+                    {
+                        return;
+                    }
                 }
 
-                // Create folder in target
-                targetDirectory = PathHelper.ChangePathToDefaultPath(target.Path);
-                string targetDirectoryPath = System.IO.Path.Combine(targetDirectory, pathWithoutSource);
-                if (!Directory.Exists(targetDirectoryPath))
+                // Create folder jobs
+                List<JobEntry> jobEntriesFolder = new List<JobEntry>();
+                string directoryPathWithoutSource = sourceDirectory.Substring(this.Path.Count());
+
+                if (targetDirectory == null)
                 {
-                    JobEntry newJobEntry = new JobEntry(this, new FileInfo(directoryPath), new FileInfo(targetDirectoryPath), WatcherChangeTypes.Created, true, null, true);
-                    Job newJob = new Job(newJobEntry);
+                    this.Targets.ForEach(target => this.AddTargetDirectoryJob(jobEntriesFolder, sourceDirectory, System.IO.Path.Combine(target.Path, directoryPathWithoutSource)));
+                }
+                else
+                {
+                    this.AddTargetDirectoryJob(jobEntriesFolder, sourceDirectory, System.IO.Path.Combine(targetDirectory, directoryPathWithoutSource));
+                }
+
+                if (jobEntriesFolder.Count != 0)
+                {
+                    Job newJob = new Job(jobEntriesFolder);
                     JobManager.AddJob(newJob);
                 }
 
-                foreach (var file in Directory.GetFiles(directoryPath))
+                // Create files jobs
+                foreach (var file in Directory.GetFiles(sourceDirectory))
                 {
                     var filePath = PathHelper.ChangePathToDefaultPath(file, true);
                     string filePathWithoutSource = filePath.Substring(this.Path.Count());
-                    string targetFilePath = System.IO.Path.Combine(targetDirectory, filePathWithoutSource);
 
-                    JobEntry newJobEntry = new JobEntry(this, new FileInfo(filePath), new FileInfo(targetFilePath), WatcherChangeTypes.Created, false, null, true);
-                    Job newJob = new Job(newJobEntry);
-                    JobManager.AddJob(newJob);
+                    List<JobEntry> jobEntriesFile = new List<JobEntry>();
+
+                    if (targetDirectory == null)
+                    {
+                        this.Targets.ForEach(target => this.AddTargetFileJob(jobEntriesFile, filePath, System.IO.Path.Combine(PathHelper.ChangePathToDefaultPath(target.Path), filePathWithoutSource)));
+                    }
+                    else
+                    {
+                        string targetFilePath = System.IO.Path.Combine(PathHelper.ChangePathToDefaultPath(targetDirectory), filePathWithoutSource);
+                        AddTargetFileJob(jobEntriesFile, filePath, targetFilePath);
+                    }
+
+                    if (jobEntriesFile.Count != 0)
+                    {
+                        Job newJob = new Job(jobEntriesFile);
+                        JobManager.AddJob(newJob);
+
+                    }
                 }
             }
         }
 
-        public void AddTarget(FileDirectory target)
+        private void AddTargetDirectoryJob(List<JobEntry> jobEntries, string sourceDirectory, string targetDirectory)
+        {
+            targetDirectory = PathHelper.ChangePathToDefaultPath(targetDirectory, false);
+            jobEntries.Add(new JobEntry(this, new FileInfo(sourceDirectory), new FileInfo(targetDirectory), WatcherChangeTypes.Created, true, null, true));
+        }
+
+        private void AddTargetFileJob(List<JobEntry> jobEntries, string sourceFile, string targetFile)
+        {
+            targetFile = PathHelper.ChangePathToDefaultPath(targetFile, true);
+            jobEntries.Add(new JobEntry(this, new FileInfo(sourceFile), new FileInfo(targetFile), WatcherChangeTypes.Created, false, null, true));
+        }
+
+        public void AddTarget(FileDirectory target, bool synchronize = false)
         {
             this.Targets.Add(target);
-            this.SynchronizeDirectoryFilesRecursiveToTarget(target.Path, this.Path);
+
+            if (synchronize)
+            {
+                this.SynchronizeDirectoryFilesRecursiveToTarget(target.Path, this.Path);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (this.watcher != null)
+            {
+                this.watcher.Dispose();
+            }
         }
 
         public override string ToString()
