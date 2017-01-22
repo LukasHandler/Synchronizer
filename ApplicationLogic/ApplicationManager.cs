@@ -1,5 +1,4 @@
-﻿using Synchronizer.Shared.EventArguments;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,6 +14,12 @@ namespace Synchronizer.ApplicationLogic
         public static Settings Settings;
 
         static ApplicationManager()
+        {
+            sourceDirectories = new List<SourceFileDirectory>();
+            Settings = new Settings();
+        }
+
+        public static void LoadSaveFiles()
         {
             try
             {

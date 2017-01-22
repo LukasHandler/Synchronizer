@@ -3,8 +3,23 @@ using System.IO;
 
 namespace Synchronizer.PresentationLogic
 {
-    public static class TryParseMethods
+    public static class ValidationMethods
     {
+        public static bool IsValidFileSize(long value)
+        {
+            return value >= 0;
+        }
+
+        public static bool IsValidBlockSize(int value)
+        {
+            return value > 0 && value != 0;
+        }
+
+        public static bool IsValidLoggingFileSize(long value)
+        {
+            return value > 0;
+        }
+
         public static bool FileInfoTryParse(string filePath, out FileInfo value)
         {
             filePath = PathHelper.ChangePathToDefaultPath(filePath, true);

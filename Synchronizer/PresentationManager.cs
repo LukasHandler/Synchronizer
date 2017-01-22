@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Synchronizer.Shared.EventArguments;
 using System.Collections;
 using System.IO;
 using System.Diagnostics;
@@ -53,10 +52,8 @@ namespace Synchronizer.PresentationLogic
 
         private int? currentSourceId;
 
-        public PresentationManager(Process loggingProcess)
+        public PresentationManager(string[] args)
         {
-            this.loggingProcess = loggingProcess;
-
             this.menus = new Dictionary<string, Menu>();
             this.menus.Add("F3", Menu.Sources);
             this.menus.Add("F4", Menu.Targets);
@@ -72,6 +69,269 @@ namespace Synchronizer.PresentationLogic
             JobManager.OnJobsChanged += RefreshJobs;
 
             this.currentSourceId = 0;
+
+            bool validArguments = this.ValidateArguments(args);
+
+            try
+            {
+                loggingProcess = Process.Start("LogPresentationLogic.exe");
+            }
+            catch (Exception exception)
+            {
+                LoggingManager.Log("Logging window couldn't start: " + exception.Message);
+            }
+
+
+            if (!validArguments)
+            {
+                ApplicationManager.LoadSaveFiles();
+            }
+        }
+
+        private bool ValidateArguments(string[] args)
+        {
+            string helpMessage = string.Format(
+                @"Help for synchronizer application:\r\n" +
+                "The order matters\r\n" +
+                "-s source1;recursive;target1,target2,...;exception1,exception2,...;source2;...\r\n" +
+                "-l logFile\r\n" +
+                "-ls logFileSize\r\n" +
+                "-mbf minimalBlockFileSize\r\n" +
+                "-bs blockSize\r\n" +
+                "-p parallelSynchronization\r\n\r\n" +
+                "or -h for help\r\n\r\n" +
+                "For example:\r\n" +
+                "-q d:\test;true;d:\test2,c:\test; -l Logs.txt -ls 10 -mbfs 10 -bs 10 -p true"
+                );
+
+            // Ignore if there are no arguments
+            if (args == null || args.Length == 0)
+            {
+                return false;
+            }
+
+            string[] newArguments = new string[args.Length];
+
+            // Trim and make to lower case
+            for (int i = 0; i < args.Length; i++)
+            {
+                newArguments[i] = args[i].ToLower().Trim();
+            }
+
+            bool validArguments;
+
+            try
+            {
+                validArguments = CheckArguments(args);
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine("Error, in validating arguments:\r\n{0}", exception.Message);
+                validArguments = false;
+            }
+
+            if (!validArguments)
+            {
+                Console.WriteLine();
+                Console.WriteLine(helpMessage);
+                Console.WriteLine("Press a key to continue without the usage of arguments");
+                Console.ReadKey();
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool CheckArguments(string[] args)
+        {
+            // If first argument is help
+            if (args[0] == "-h")
+            {
+                return false;
+            }
+
+            if (args.Length != 12)
+            {
+                Console.WriteLine("Error, must contain 6 parameters with given values");
+                return false;
+            }
+            if (args[0] != "-s" ||
+                args[2] != "-l" ||
+                args[4] != "-ls" ||
+                args[6] != "-mbf" ||
+                args[8] != "-bs" ||
+                args[10] != "-p")
+            {
+                Console.WriteLine("Error, wrong order");
+                return false;
+            }
+            // Validate sources
+            string[] sources = args[1].Split('|');
+            int i = 0;
+
+            foreach (var sourceRow in sources)
+            {
+                if (string.IsNullOrEmpty(sourceRow.Trim()))
+                {
+                    continue;
+                }
+
+                string[] sourceElements = sourceRow.Split(';');
+
+                if (sourceElements.Length != 4)
+                {
+                    Console.WriteLine("Error, each source row must contain 4 values");
+                    return false;
+                }
+
+                int j = 0;
+
+                foreach (var sourceSection in sourceElements)
+                {
+                    if (j == 0)
+                    {
+                        DirectoryInfo directory;
+
+                        if (!ValidationMethods.DirectoryInfoTryParse(sourceSection, out directory))
+                        {
+                            Console.WriteLine("Error, {0} is not a valid directory path", sourceSection);
+                            return false;
+                        }
+
+
+                        bool recursive;
+                        if (!bool.TryParse(sourceElements[1], out recursive))
+                        {
+                            Console.WriteLine("Error, {0} is not a valid recursive value", sourceSection);
+                            return false;
+                        }
+
+                        string errorMessage = ApplicationManager.AddSource(directory.FullName, recursive);
+
+                        if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            Console.WriteLine("Error, couldn't create source {0} because: \r\n{1}", sourceSection, errorMessage);
+                            return false;
+                        }
+
+                    }
+                    else if (j == 2)
+                    {
+                        if (string.IsNullOrEmpty(sourceSection.Trim()))
+                        {
+                            j++;
+                            continue;
+                        }
+
+                        string[] targets = sourceSection.Split(',');
+
+                        foreach (var target in targets)
+                        {
+                            DirectoryInfo directory;
+
+                            if (!ValidationMethods.DirectoryInfoTryParse(target, out directory))
+                            {
+                                Console.WriteLine("Error, {0} is not a valid directory path", target);
+                                return false;
+                            }
+
+                            string errorMessage = ApplicationManager.AddTarget(i, directory.FullName);
+                            if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                Console.WriteLine("Error, couldn't create target {0} because: \r\n{1}", target, errorMessage);
+                                return false;
+                            }
+                        }
+                    }
+                    else if (j == 3)
+                    {
+                        if (string.IsNullOrEmpty(sourceSection.Trim()))
+                        {
+                            j++;
+                            continue;
+                        }
+
+                        string[] exceptions = sourceSection.Split(',');
+
+                        foreach (var exception in exceptions)
+                        {
+                            DirectoryInfo directory;
+
+                            if (!ValidationMethods.DirectoryInfoTryParse(exception, out directory))
+                            {
+                                Console.WriteLine("Error, {0} is not a valid directory path", exception);
+                                return false;
+                            }
+
+                            string errorMessage = ApplicationManager.AddException(i, directory.FullName);
+                            if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                Console.WriteLine("Error, couldn't create exception {0} because: \r\n{1}", exception, errorMessage);
+                                return false;
+                            }
+                        }
+                    }
+
+                    j++;
+                }
+
+                i++;
+            }
+
+            // Validate logfile
+            FileInfo loggingFile;
+
+            if (!ValidationMethods.FileInfoTryParse(args[3], out loggingFile))
+            {
+                Console.WriteLine("Error, {0} is not a valid directory path", args[3]);
+                return false;
+            }
+
+            ApplicationManager.Settings.LoggingFile = loggingFile;
+
+            // Validate log file size
+            long logFileSize;
+
+            if (!long.TryParse(args[5], out logFileSize) || !ValidationMethods.IsValidLoggingFileSize(logFileSize))
+            {
+                Console.WriteLine("Error, {0} is not a valid logging file size", args[5]);
+                return false;
+            }
+
+            ApplicationManager.Settings.MaxLoggingFileSize = logFileSize;
+
+            // Validate minimal block file size
+            long minimalBlockFileSize;
+
+            if (!long.TryParse(args[7], out minimalBlockFileSize) || !ValidationMethods.IsValidFileSize(minimalBlockFileSize))
+            {
+                Console.WriteLine("Error, {0} is not a valid minimal block file size", args[7]);
+                return false;
+            }
+
+            ApplicationManager.Settings.BlockCompareMinFileSize = minimalBlockFileSize;
+
+            // Validate block size
+            int blockSize;
+
+            if (!int.TryParse(args[9], out blockSize) || !ValidationMethods.IsValidBlockSize(blockSize))
+            {
+                Console.WriteLine("Error, {0} is not a valid block size", args[9]);
+                return false;
+            }
+
+            ApplicationManager.Settings.BlockCompareBlockSize = blockSize;
+
+            // Validate parallel sync
+            bool parallelSync;
+            if (!bool.TryParse(args[11], out parallelSync))
+            {
+                Console.WriteLine("Error, {0} is not a valid parallel synchronization value", args[11]);
+                return false;
+            }
+
+            ApplicationManager.Settings.ParallelSync = parallelSync;
+            return true;
         }
 
         private void RefreshJobs(object sender, EventArgs args)
@@ -549,17 +809,12 @@ namespace Synchronizer.PresentationLogic
 
             // Get want to change value
             bool wantChange;
-            GetInput<bool>(TryParseMethods.YesNoTryParse, out wantChange, "Want to change? y/n ", "Invalid input. Must be \"n\" or \"y\"");
+            GetInput<bool>(ValidationMethods.YesNoTryParse, out wantChange, "Want to change? y/n ", "Invalid input. Must be \"n\" or \"y\"");
 
             if (wantChange)
             {
                 // Get block compare minimal file size value
                 long newBlockCompareMinFileSize;
-
-                IsValid<long> validFileSize = delegate (long value)
-                {
-                    return value >= 0;
-                };
 
                 if (this.GetInput(
                     long.TryParse,
@@ -568,18 +823,13 @@ namespace Synchronizer.PresentationLogic
                     string.Format("Error, value must be a number between 0 and {0}", long.MaxValue),
                     false,
                     true,
-                    validFileSize))
+                    ValidationMethods.IsValidFileSize))
                 {
                     ApplicationManager.Settings.BlockCompareMinFileSize = newBlockCompareMinFileSize;
                 }
 
                 // Get block compare block size value
                 int newBlockCompareBlockSize;
-
-                IsValid<int> validBlockSize = delegate (int value)
-                {
-                    return value > 0 && value != 0;
-                };
 
                 if (this.GetInput(
                     int.TryParse,
@@ -588,7 +838,7 @@ namespace Synchronizer.PresentationLogic
                     string.Format("Error, value must be a number between 1 and {0}", Int32.MaxValue),
                     false,
                     true,
-                    validBlockSize))
+                    ValidationMethods.IsValidBlockSize))
                 {
                     ApplicationManager.Settings.BlockCompareBlockSize = newBlockCompareBlockSize;
                 }
@@ -611,7 +861,7 @@ namespace Synchronizer.PresentationLogic
                 FileInfo newloggingFilePath;
 
                 if (this.GetInput(
-                    TryParseMethods.FileInfoTryParse,
+                    ValidationMethods.FileInfoTryParse,
                     out newloggingFilePath,
                     string.Format("New logging file (empty to keep {0}): ", loggingFilePath),
                     "Error, path must be a valid file",
@@ -625,10 +875,6 @@ namespace Synchronizer.PresentationLogic
                 long newMaxLoggingFileSize;
 
 
-                IsValid<long> validLoggingFileSize = delegate (long value)
-                {
-                    return value > 0;
-                };
 
                 if (this.GetInput(
                     long.TryParse,
@@ -637,7 +883,7 @@ namespace Synchronizer.PresentationLogic
                     string.Format("Error, value must be a number between 1 and {0}", long.MaxValue),
                     false,
                     true,
-                    validLoggingFileSize))
+                    ValidationMethods.IsValidLoggingFileSize))
                 {
                     ApplicationManager.Settings.MaxLoggingFileSize = newMaxLoggingFileSize;
                 }
@@ -750,7 +996,7 @@ namespace Synchronizer.PresentationLogic
             };
 
             if (this.GetInput(
-                TryParseMethods.DirectoryInfoTryParse,
+                ValidationMethods.DirectoryInfoTryParse,
                 out newDirectory,
                 string.Format("Enter path for new {0} (\"exit\" to cancel): ", operation.ToString()),
                 "Error, not a valid path",

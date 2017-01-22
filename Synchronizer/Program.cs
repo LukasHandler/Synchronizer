@@ -13,19 +13,9 @@ namespace Synchronizer.PresentationLogic
     {
         static void Main(string[] args)
         {
-            Process loggingProcess = null;
-
-            try
-            {
-                loggingProcess = Process.Start("LogPresentationLogic.exe");
-            }
-            catch(Exception exception)
-            {
-                Console.WriteLine("Logging window couldn't start\r\n" + exception.Message);
-            }
-
-            PresentationManager presentationManager = new PresentationManager(loggingProcess);
+            PresentationManager presentationManager = new PresentationManager(args);
             presentationManager.Start();
         }
+
     }
 }

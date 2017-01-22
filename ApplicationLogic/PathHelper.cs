@@ -43,7 +43,10 @@ namespace Synchronizer.ApplicationLogic
                 var objectName = newPath.Split('\\').Last();
                 int index = newPath.IndexOf(objectName);
                 string dictionaryPath = PathHelper.ChangePathToDefaultPath(newPath.Remove(index, objectName.Length));
-                newPath = dictionaryPath.ToLower() + objectName;
+                if (dictionaryPath != "\\")
+                {
+                    newPath = dictionaryPath.ToLower() + objectName;
+                }
             }
             else
             {

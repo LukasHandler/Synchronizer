@@ -43,8 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="TryParseMethods.cs" />
-    <Compile Include="PathValidator.cs" />
+    <Compile Include="ValidationMethods.cs" />
     <Compile Include="PresentationManager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -60,10 +59,6 @@
     <ProjectReference Include="..\LogPresentationLogic\LogPresentationLogic.csproj">
       <Project>{5ca32099-68d9-41fa-9998-ae92cbd1b3f4}</Project>
       <Name>LogPresentationLogic</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Shared\Shared.csproj">
-      <Project>{76b98587-9046-4079-8783-ab8ab73fef4e}</Project>
-      <Name>Shared</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
