@@ -25,9 +25,7 @@ namespace Synchronizer.PresentationLogic
             Targets,
             Exceptions,
             Jobs,
-            Logs,
             Settings,
-            Help
         }
 
         private enum IdOperation
@@ -59,9 +57,7 @@ namespace Synchronizer.PresentationLogic
             this.menus.Add("F4", Menu.Targets);
             this.menus.Add("F5", Menu.Exceptions);
             this.menus.Add("F6", Menu.Jobs);
-            this.menus.Add("F7", Menu.Logs);
-            this.menus.Add("F8", Menu.Settings);
-            this.menus.Add("F9", Menu.Help);
+            this.menus.Add("F7", Menu.Settings);
 
             this.Logs = new ConcurrentBag<string>();
             this.JobLogs = new ConcurrentBag<string>();
@@ -82,7 +78,7 @@ namespace Synchronizer.PresentationLogic
             }
 
 
-            if (!validArguments)
+            if (!validArguments || (args.Count() > 1 && args.First() == "//"))
             {
                 string errorMessage = ApplicationManager.LoadSaveFiles();
 
@@ -533,14 +529,8 @@ namespace Synchronizer.PresentationLogic
                 case Menu.Exceptions:
                     this.PrintExceptions();
                     break;
-                case Menu.Logs:
-                    this.PrintLogs();
-                    break;
                 case Menu.Jobs:
                     this.PrintJobs();
-                    break;
-                case Menu.Help:
-                    this.ChangeMenu();
                     break;
             }
         }
@@ -785,15 +775,6 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
-        private void PrintLogs()
-        {
-            //var logs = ApplicationManager.GetLogs();
-            //foreach (var log in logs)
-            //{
-            //    Console.WriteLine(log);
-            //}
-        }
-
         private void PrintSettings()
         {
             string blockCompareMinFileSize = Convert.ToString(ApplicationManager.Settings.BlockCompareMinFileSize);
@@ -976,7 +957,14 @@ namespace Synchronizer.PresentationLogic
                 switch (operation)
                 {
                     case PathOperation.Source:
-                        errorMessage = ApplicationManager.AddSource(value.FullName);
+                        bool isRecursive;
+
+                        if (!GetInput(bool.TryParse, out isRecursive, "Is recursive: ", "Error, value must be \"true\" or \"false\""))
+                        {
+                            return false;
+                        }
+
+                        errorMessage = ApplicationManager.AddSource(value.FullName, isRecursive);
                         break;
                     case PathOperation.Target:
                         errorMessage = ApplicationManager.AddTarget(this.currentSourceId.Value, value.FullName);

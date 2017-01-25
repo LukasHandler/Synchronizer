@@ -76,12 +76,13 @@ namespace Synchronizer.ApplicationLogic
 
         public static List<string> GetSources()
         {
-            return sourceDirectories.Select(p => p.ToString()).ToList();
+            return sourceDirectories.Select(p => p.ToString() + "    Recursive: " + p.Recursive.ToString()).ToList();
         }
 
-        public static string AddSource(string path, bool recursive = false)
+        public static string AddSource(string path, bool recursive)
         {
-            var newSource = new SourceFileDirectory(path, recursive);
+            DirectoryInfo directoryInfo = new DirectoryInfo(path);
+            var newSource = new SourceFileDirectory(directoryInfo, recursive);
             var newDirectories = Serializer.CopyObject(sourceDirectories);
             newDirectories.Add(newSource);
             var errorMessage = PathHelper.IsValid(newDirectories);
@@ -89,6 +90,11 @@ namespace Synchronizer.ApplicationLogic
             if (string.IsNullOrEmpty(errorMessage))
             {
                 sourceDirectories.Add(newSource);
+                newSource.InitWatcher();
+            }
+            else
+            {
+                newSource.Dispose();
             }
 
             return errorMessage;
@@ -108,7 +114,7 @@ namespace Synchronizer.ApplicationLogic
 
         public static string AddTarget(int sourceId, string path, bool startSynchronization = true)
         {
-            var newTarget = new FileDirectory(path);
+            var newTarget = new DirectoryInfo(path);
             var newDirectories = Serializer.CopyObject(sourceDirectories);
             newDirectories[sourceId].AddTarget(newTarget);
             var errorMessage = PathHelper.IsValid(newDirectories);
@@ -133,7 +139,7 @@ namespace Synchronizer.ApplicationLogic
 
         public static string AddException(int sourceId, string path)
         {
-            var newException = new FileDirectory(path);
+            var newException = new DirectoryInfo(path);
             var newDirectories = Serializer.CopyObject(sourceDirectories);
             newDirectories[sourceId].Exceptions.Add(newException);
             var errorMessage = PathHelper.IsValid(newDirectories);

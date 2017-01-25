@@ -48,6 +48,8 @@ namespace Synchronizer.ApplicationLogic
             }
             while (!finished);
 
+            sourceStream.Position = 0;
+            targetStream.Position = 0;
             sourceStream.Dispose();
             targetStream.Dispose();
         }

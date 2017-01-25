@@ -15,6 +15,5 @@ namespace Synchronizer.PresentationLogic
         {
             PresentationManager presentationManager = new PresentationManager(args);
         }
-
     }
 }

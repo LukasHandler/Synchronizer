@@ -115,7 +115,11 @@ namespace Synchronizer.ApplicationLogic
                 {
                     ProcessedJobs.Remove(job);
                     lastJobFinished = true;
-                    OnJobsChanged?.Invoke(null, EventArgs.Empty);
+
+                    if (ProcessedJobs.Count == 0)
+                    {
+                        OnJobsChanged?.Invoke(null, EventArgs.Empty);
+                    }
                 }
             }
         }

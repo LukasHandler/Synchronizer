@@ -9,15 +9,9 @@ namespace Synchronizer.ApplicationLogic
 {
     public static class PathHelper
     {
-        public enum SourceErrors
+        public static bool IsSamePath(FileSystemInfo path1, FileSystemInfo path2)
         {
-            Valid,
-            SourceAlreadyExists,
-        }
-
-        public static bool IsSamePath(string path1, string path2)
-        {
-            if (ChangePathToDefaultPath(path1) == ChangePathToDefaultPath(path2))
+            if (path1.FullName.ToLower().TrimEnd('\\') == path2.FullName.ToLower().TrimEnd('\\'))
             {
                 return true;
             }
@@ -27,16 +21,9 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
-        public static string RemoveFileFromDirectoryPath(string full, string toDelete)
-        {
-            // http://stackoverflow.com/questions/2201595/c-sharp-simplest-way-to-remove-first-occurance-of-a-substring-from-another-str
-            int index = full.IndexOf(toDelete);
-            return PathHelper.ChangePathToDefaultPath(full.Remove(index, toDelete.Length));
-        }
-
         public static string ChangePathToDefaultPath(string path, bool isFile = false)
         {
-            string newPath = path.Replace('/', '\\').Trim().TrimEnd('\\');
+            string newPath = path.Replace('/', '\\').Trim().TrimEnd('\\').ToLower();
 
             if (isFile)
             {
@@ -50,7 +37,6 @@ namespace Synchronizer.ApplicationLogic
             }
             else
             {
-                newPath = newPath.ToLower();
                 newPath += '\\';
             }
 
@@ -60,7 +46,7 @@ namespace Synchronizer.ApplicationLogic
         public static string GetLogicalDriveName(string path)
         {
             string defaultPath = ChangePathToDefaultPath(path);
-            
+
             if (defaultPath.Contains(':'))
             {
                 return defaultPath.Split(':').First();
@@ -71,8 +57,10 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
-        public static bool CanSynchronize(List<string> pathes)
+        public static bool CanSynchronize(List<DirectoryInfo> targets)
         {
+            List<string> pathes = targets.Select(p => p.FullName).ToList();
+
             if (pathes == null || pathes.Count <= 1)
             {
                 return false;
@@ -115,46 +103,49 @@ namespace Synchronizer.ApplicationLogic
         public static string IsValid(List<SourceFileDirectory> sourceDirectories)
         {
             // Validate all pathes and change the layout.
-            foreach (var source in sourceDirectories)
+            for (int sourceIndex = 0; sourceIndex < sourceDirectories.Count; sourceIndex++)
             {
+                var source = sourceDirectories[sourceIndex];
+
                 // Check source.
-                if (!Directory.Exists(source.Path))
+                if (!source.DirectoryPath.Exists)
                 {
-                    int sourceIndex = sourceDirectories.FindIndex(p => p == source);
-                    return string.Format("Source {0} {1} doesn't exist", sourceIndex, source.Path);
+                    return string.Format("Source {0} {1} doesn't exist", sourceIndex, source.DirectoryPath);
                 }
                 else
                 {
-                    source.Path = ChangePathToDefaultPath(source.Path);
+                    source.DirectoryPath = new DirectoryInfo(ChangePathToDefaultPath(source.DirectoryPath.FullName));
                 }
 
                 // Check all targets.
-                foreach (var target in source.Targets)
+                for (int i = 0; i < source.Targets.Count; i++)
                 {
-                    if (!Directory.Exists(target.Path))
+                    var target = source.Targets[i];
+
+                    if (!target.Exists)
                     {
-                        int targetIndex = sourceDirectories.FindIndex(p => p == target);
-                        return string.Format("Target {0} {1} doesn't exist", targetIndex, target.Path);
+                        return string.Format("Target {0} {1} doesn't exist", i, target.FullName);
                     }
                     else
                     {
-                        target.Path = ChangePathToDefaultPath(target.Path);
+                        target = new DirectoryInfo(ChangePathToDefaultPath(target.FullName));
                     }
                 }
 
                 // Check all exceptions.
-                foreach (var exception in source.Exceptions)
+                for (int j = 0; j < source.Exceptions.Count; j++)
                 {
-                    if (!Directory.Exists(exception.Path))
+                    var exception = source.Exceptions[j];
+                    if (!exception.Exists)
                     {
-                        int exceptionIndex = sourceDirectories.FindIndex(p => p == exception);
-                        return string.Format("Exception {0} {1} doesn't exist", exceptionIndex, exception.Path);
+                        return string.Format("Exception {0} {1} doesn't exist", j, exception.FullName);
                     }
                     else
                     {
-                        exception.Path = ChangePathToDefaultPath(exception.Path);
+                        exception = new DirectoryInfo(ChangePathToDefaultPath(exception.FullName));
                     }
                 }
+
             }
 
             // Validate each source
@@ -164,117 +155,79 @@ namespace Synchronizer.ApplicationLogic
 
                 // Aagainst the other sources.
                 // The same source twice?
-                if (sourceDirectories.Where(p => IsSamePath(p.Path, source.Path)).Count() > 1)
+                if (sourceDirectories.Where(p => IsSamePath(p.DirectoryPath, source.DirectoryPath)).Count() > 1)
                 {
-                    return string.Format("The source {0} appears more than once in sources", source.Path);
+                    return string.Format("The source {0} appears more than once in sources", source.DirectoryPath);
                 }
 
                 // The same target twice
                 foreach (var target in source.Targets)
                 {
-                    if (source.Targets.Where(p => IsSamePath(p.Path, target.Path)).Count() > 1)
+                    if (source.Targets.Where(p => IsSamePath(p, target)).Count() > 1)
                     {
-                        return string.Format("The target {0} appears more than once in targets", target.Path);
+                        return string.Format("The target {0} appears more than once in targets", target.FullName);
                     }
                 }
 
                 // The same exception twice
                 foreach (var exception in source.Targets)
                 {
-                    if (source.Exceptions.Where(p => IsSamePath(p.Path, exception.Path)).Count() > 1)
+                    if (source.Exceptions.Where(p => IsSamePath(p, exception)).Count() > 1)
                     {
-                        return string.Format("The exception {0} appears more than once in exceptions", exception.Path);
+                        return string.Format("The exception {0} appears more than once in exceptions", exception.FullName);
                     }
                 }
 
                 // Any source who is a parent to the current one and not an exception in the parent entry?
-                var parentSource = sourceDirectories.FirstOrDefault(p => IsSubDirectoryOfPath(source.Path, p.Path) && !p.Exceptions.Any(exception => IsSamePath(exception.Path, source.Path) || IsSubDirectoryOfPath(source.Path, exception.Path)));
+                var parentSource = sourceDirectories.FirstOrDefault(p => IsSubDirectoryOfPath(source.DirectoryPath, p.DirectoryPath) && !p.Exceptions.Any(exception => IsSamePath(exception, source.DirectoryPath) || IsSubDirectoryOfPath(source.DirectoryPath, exception)));
                 if (parentSource != null)
                 {
                     int parentSourceIndex = sourceDirectories.FindIndex(p => p == parentSource);
-                    return string.Format("The source {0} {1} has a conflict with source {2} {3}", sourceIndex, source.Path, parentSourceIndex, parentSource.Path);
+                    return string.Format("The source {0} {1} has a conflict with source {2} {3}", sourceIndex, source.DirectoryPath, parentSourceIndex, parentSource.DirectoryPath.FullName);
                 }
 
                 // Any source who is a child to the current one and not an exception in the current entry?
-                var childSource = sourceDirectories.FirstOrDefault(p => IsSubDirectoryOfPath(p.Path, source.Path) && !source.Exceptions.Any(x => IsSamePath(x.Path, p.Path) || IsSubDirectoryOfPath(p.Path, x.Path)));
+                var childSource = sourceDirectories.FirstOrDefault(sourceDirectory => IsSubDirectoryOfPath(sourceDirectory.DirectoryPath, source.DirectoryPath) && !source.Exceptions.Any(exception => IsSamePath(exception, sourceDirectory.DirectoryPath) || IsSubDirectoryOfPath(sourceDirectory.DirectoryPath, exception)));
                 if (childSource != null)
                 {
                     int childSourceIndex = sourceDirectories.FindIndex(p => p == childSource);
-                    return string.Format("The source {0} {1} has a conflict with source {2} {3}", sourceIndex, source.Path, childSourceIndex, childSource.Path);
+                    return string.Format("The source {0} {1} has a conflict with source {2} {3}", sourceIndex, source.DirectoryPath, childSourceIndex, childSource.DirectoryPath.FullName);
                 }
 
                 // Check if source exists in targets, or in a subdirectory in one of them, or a target is a sub directory of the new path, also taking in mind exceptions.
                 var conflictTarget = sourceDirectories.FirstOrDefault(p =>
-                p.Targets.Any(target => IsSamePath(source.Path, target.Path) ||
-                (IsSubDirectoryOfPath(source.Path, target.Path) && !p.Exceptions.Any(l => IsSamePath(source.Path, l.Path) || IsSubDirectoryOfPath(source.Path, l.Path))) ||
-                (IsSubDirectoryOfPath(target.Path, source.Path) && !p.Exceptions.Any(l => IsSamePath(target.Path, l.Path) || IsSubDirectoryOfPath(target.Path, l.Path)))));
+                p.Targets.Any(target => IsSamePath(source.DirectoryPath, target) ||
+                (IsSubDirectoryOfPath(source.DirectoryPath, target) && !p.Exceptions.Any(l => IsSamePath(source.DirectoryPath, l) || IsSubDirectoryOfPath(source.DirectoryPath, l))) ||
+                (IsSubDirectoryOfPath(target, source.DirectoryPath) && !p.Exceptions.Any(exception => IsSamePath(target, exception) || IsSubDirectoryOfPath(target, exception)))));
 
                 if (conflictTarget != null)
                 {
                     var conflictTargetIndex = sourceDirectories.FindIndex(p => p == conflictTarget);
-                    return string.Format("The source {0} {1} has a conflict with targets in source {2} {3}", sourceIndex, source.Path, conflictTargetIndex, conflictTarget.Path);
+                    return string.Format("The source {0} {1} has a conflict with targets in source {2} {3}", sourceIndex, source.DirectoryPath, conflictTargetIndex, conflictTarget);
                 }
 
                 // Any same exceptions or exceptions are not child of source?
-                var conflictException = source.Exceptions.FirstOrDefault(p => IsSamePath(source.Path, p.Path) || !IsSubDirectoryOfPath(p.Path, source.Path));
+                var conflictException = source.Exceptions.FirstOrDefault(p => IsSamePath(source.DirectoryPath, p) || !IsSubDirectoryOfPath(p, source.DirectoryPath));
 
                 if (conflictException != null)
                 {
                     var conflictExceptionIndex = source.Exceptions.FindIndex(p => p == conflictException);
-                    return string.Format("The source {0} {1} has a conflict with exception {2} {3}", conflictExceptionIndex, conflictException.Path);
+                    return string.Format("The source {0} {1} has a conflict with exception {2} {3}", conflictExceptionIndex, conflictException);
                 }
             }
 
             return null;
         }
 
-        public static string IsValidSource(string path, List<SourceFileDirectory> sourceDirectories)
+        public static bool IsSubDirectoryOfPath(FileSystemInfo subDirectory, FileSystemInfo path)
         {
-            // Check if source already exists
-            if (sourceDirectories.Any(p => IsSamePath(path, p.Path)))
-            {
-                return "Source already exists";
-            }
-
-            // Check if path is a sub directory of a existing source and not an exception
-            var parentDirectories = sourceDirectories.Where(p => IsSubDirectoryOfPath(path, p.Path));
-            if (parentDirectories != null)
-            {
-                // Check if each of the parent directories have the new path in the exceptions
-                foreach (var item in parentDirectories)
-                {
-                    if (!item.Exceptions.Any(p => IsSamePath(path, p.Path) || IsSubDirectoryOfPath(path, p.Path)))
-                    {
-                        var sourceIndex = sourceDirectories.FindIndex(p => p == item);
-                        return string.Format("Path is a subdirectory of source {0} {1}, but not an exception", sourceIndex, item.Path);
-                    }
-                }
-            }
-
-            // Check if source exists in targets, or in a subdirectory in one of them, or a target is a sub directory of the new path, also taking in mind exceptions.
-            var conflictTarget = sourceDirectories.FirstOrDefault(p =>
-            p.Targets.Any(a => IsSamePath(path, a.Path) ||
-            (IsSubDirectoryOfPath(path, a.Path) && !p.Exceptions.Any(l => IsSamePath(path, l.Path) || IsSubDirectoryOfPath(path, l.Path))) ||
-            (IsSubDirectoryOfPath(a.Path, path) && !p.Exceptions.Any(l => IsSamePath(a.Path, l.Path) || IsSubDirectoryOfPath(a.Path, l.Path)))));
-
-            if (conflictTarget != null)
-            {
-                var sourceIndex = sourceDirectories.FindIndex(p => p == conflictTarget);
-                return string.Format("Conflict with new path and targets in source {0} {1}", sourceIndex, conflictTarget.Path);
-            }
-
-            return string.Empty;
-        }
-
-        public static bool IsSubDirectoryOfPath(string subDirectory, string path)
-        {
-            if (IsSamePath(subDirectory, path) || subDirectory.Count() <= path.Count())
+            if (IsSamePath(subDirectory, path) || subDirectory.FullName.Count() <= path.FullName.Count())
             {
                 return false;
             }
             else
             {
-                return ChangePathToDefaultPath(subDirectory).Contains(ChangePathToDefaultPath(path));
+                return ChangePathToDefaultPath(subDirectory.FullName).Contains(ChangePathToDefaultPath(path.FullName));
             }
         }
     }
