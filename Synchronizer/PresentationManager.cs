@@ -75,9 +75,8 @@ namespace Synchronizer.PresentationLogic
                 if (!string.IsNullOrEmpty(errorMessage))
                 {
                     Console.WriteLine(errorMessage);
-                    Console.WriteLine("Change and restart application. You can also delete the *.save files to create a new structure. Program will close");
-                    Console.ReadLine();
-                    return;
+                    Console.WriteLine("Press a key to start with an empty structure");
+                    Console.ReadKey(true);
                 }
             }
 
@@ -238,7 +237,7 @@ namespace Synchronizer.PresentationLogic
                 Console.WriteLine();
                 Console.WriteLine(helpMessage);
                 Console.WriteLine("Press a key to continue without the usage of arguments");
-                Console.ReadKey();
+                Console.ReadKey(true);
                 return false;
             }
 

@@ -23,7 +23,7 @@ namespace Synchronizer.ApplicationLogic
         public Settings()
         {
             this.BlockCompareMinFileSize = 1024;
-            this.BlockCompareBlockSize = 100;
+            this.BlockCompareBlockSize = 10000;
             this.ParallelSync = true;
             this.LoggingFile = new FileInfo("Logs.txt");
             this.MaxLoggingFileSize = 1024;

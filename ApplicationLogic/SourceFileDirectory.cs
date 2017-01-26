@@ -222,7 +222,9 @@ namespace Synchronizer.ApplicationLogic
         /// <param name="target">The target.</param>
         private void CreateJobForTarget(FileSystemInfo source, FileSystemInfo target)
         {
-            JobEntry entry = new JobEntry(this, source, target, WatcherChangeTypes.Created, null, true);
+            string directoryPathWithoutSource = source.FullName.Substring(this.DirectoryPath.FullName.Count());
+            FileInfo file = new FileInfo(Path.Combine(target.FullName, directoryPathWithoutSource));
+            JobEntry entry = new JobEntry(this, source, file, WatcherChangeTypes.Created, null, true);
             Job newJob = new Job(entry);
             JobManager.AddJob(newJob);
         }

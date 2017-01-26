@@ -66,7 +66,14 @@ namespace Synchronizer.ApplicationLogic
                 Settings = new Settings();
             }
 
-            return PathHelper.IsValid(sourceDirectories);
+            string errorMessage = PathHelper.IsValid(sourceDirectories);
+
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                sourceDirectories = new List<SourceFileDirectory>();
+            }
+
+            return errorMessage;
         }
 
         /// <summary>
