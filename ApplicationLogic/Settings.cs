@@ -1,15 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿//-----------------------------------------------------------------------
+// <copyright file="Settings.cs" company="Lukas Handler">
+//     Lukas Handler
+// </copyright>
+// <summary>
+// This file contains the settings of the program.
+// </summary>
+//-----------------------------------------------------------------------
 namespace Synchronizer.ApplicationLogic
 {
-    [Serializable()]
+    using System;
+    using System.IO;
+
+    /// <summary>
+    /// This class contains the settings of the program.
+    /// </summary>
+    [Serializable]
     public class Settings
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Settings"/> class.
+        /// </summary>
         public Settings()
         {
             this.BlockCompareMinFileSize = 1024;
@@ -51,8 +61,20 @@ namespace Synchronizer.ApplicationLogic
         /// </value>
         public long MaxLoggingFileSize { get; set; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether it can parallel synchronize or not.
+        /// </summary>
+        /// <value>
+        ///   True if it can parallel synchronize.
+        /// </value>
         public bool ParallelSync { get; set; }
 
+        /// <summary>
+        /// Returns a <see cref="System.String" /> that represents this instance.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="System.String" /> that represents this instance.
+        /// </returns>
         public override string ToString()
         {
             return string.Format("Minimum file size to use block comparison: " + this.BlockCompareMinFileSize +

@@ -1,55 +1,49 @@
-﻿using Synchronizer.ApplicationLogic;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Collections;
-using System.IO;
-using System.Diagnostics;
-
+﻿//-----------------------------------------------------------------------
+// <copyright file="PresentationManager.cs" company="Lukas Handler">
+//     Lukas Handler
+// </copyright>
+// <summary>
+// This file represents the presentation manager.
+// </summary>
+//-----------------------------------------------------------------------
 namespace Synchronizer.PresentationLogic
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.IO;
+    using System.Linq;
+    using ApplicationLogic;
+
+    /// <summary>
+    /// This class contains the UI interaction.
+    /// </summary>
     public class PresentationManager
     {
-        private ConcurrentBag<string> Logs;
-
-        private ConcurrentBag<string> JobLogs;
-
+        /// <summary>
+        /// The process holding the logging window.
+        /// </summary>
         private Process loggingProcess;
 
-        private enum Menu
-        {
-            Sources,
-            Targets,
-            Exceptions,
-            Jobs,
-            Settings,
-        }
-
-        private enum IdOperation
-        {
-            DeleteSource,
-            DeleteTarget,
-            DeleteException,
-            GetTargets,
-            GetExceptions
-        }
-
-        private enum PathOperation
-        {
-            Source,
-            Target,
-            Exception
-        }
-
+        /// <summary>
+        /// Holds a connection between a key and a menu.
+        /// </summary>
         private Dictionary<string, Menu> menus;
 
+        /// <summary>
+        /// The current menu.
+        /// </summary>
         private Menu currentMenu;
 
+        /// <summary>
+        /// The current source identifier.
+        /// </summary>
         private int? currentSourceId;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PresentationManager"/> class.
+        /// </summary>
+        /// <param name="args">The arguments.</param>
         public PresentationManager(string[] args)
         {
             this.menus = new Dictionary<string, Menu>();
@@ -59,10 +53,7 @@ namespace Synchronizer.PresentationLogic
             this.menus.Add("F6", Menu.Jobs);
             this.menus.Add("F7", Menu.Settings);
 
-            this.Logs = new ConcurrentBag<string>();
-            this.JobLogs = new ConcurrentBag<string>();
-
-            JobManager.OnJobsChanged += RefreshJobs;
+            JobManager.OnJobsChanged += this.RefreshJobs;
 
             this.currentSourceId = 0;
 
@@ -70,13 +61,12 @@ namespace Synchronizer.PresentationLogic
 
             try
             {
-                loggingProcess = Process.Start("LogPresentationLogic.exe");
+                this.loggingProcess = Process.Start("LogPresentationLogic.exe");
             }
             catch (Exception exception)
             {
                 LoggingManager.Log("Logging window couldn't start: " + exception.Message);
             }
-
 
             if (!validArguments || (args.Count() > 1 && args.First() == "//"))
             {
@@ -92,9 +82,114 @@ namespace Synchronizer.PresentationLogic
             }
 
             ApplicationManager.InitialSynchronization();
-            Start();
+            this.Start();
         }
 
+        /// <summary>
+        /// Placeholder for a method to parse a string to a specific type.
+        /// </summary>
+        /// <typeparam name="T">The type to convert to.</typeparam>
+        /// <param name="str">The string to validate.</param>
+        /// <param name="value">The converted value.</param>
+        /// <returns>True if it can convert the value.</returns>
+        private delegate bool TryParse<T>(string str, out T value);
+
+        /// <summary>
+        /// Placeholder for a method that checks is a value of a given type is valid.
+        /// </summary>
+        /// <typeparam name="T">The type to check.</typeparam>
+        /// <param name="value">The value to check.</param>
+        /// <returns>True if the value of the type is valid.</returns>
+        private delegate bool IsValid<T>(T value);
+
+        /// <summary>
+        /// The menus.
+        /// </summary>
+        private enum Menu
+        {
+            /// <summary>
+            /// The sources menu.
+            /// </summary>
+            Sources,
+
+            /// <summary>
+            /// The targets menu.
+            /// </summary>
+            Targets,
+
+            /// <summary>
+            /// The exceptions menu.
+            /// </summary>
+            Exceptions,
+
+            /// <summary>
+            /// The jobs menu.
+            /// </summary>
+            Jobs,
+
+            /// <summary>
+            /// The settings menu.
+            /// </summary>
+            Settings,
+        }
+
+        /// <summary>
+        /// The possible operation for getting an identifier.
+        /// </summary>
+        private enum IdOperation
+        {
+            /// <summary>
+            /// The delete source operation.
+            /// </summary>
+            DeleteSource,
+
+            /// <summary>
+            /// The delete target operation.
+            /// </summary>
+            DeleteTarget,
+
+            /// <summary>
+            /// The delete exception operation.
+            /// </summary>
+            DeleteException,
+
+            /// <summary>
+            /// The get targets operation.
+            /// </summary>
+            GetTargets,
+
+            /// <summary>
+            /// The get exceptions operation.
+            /// </summary>
+            GetExceptions
+        }
+
+        /// <summary>
+        /// The operation for inserting a path.
+        /// </summary>
+        private enum PathOperation
+        {
+            /// <summary>
+            /// The source path operation.
+            /// </summary>
+            Source,
+
+            /// <summary>
+            /// The target path operation.
+            /// </summary>
+            Target,
+
+            /// <summary>
+            /// The exception path operation.
+            /// </summary>
+            Exception
+        }
+
+        /// <summary>
+        /// Validates the arguments.
+        /// </summary>
+        /// <param name="args">The arguments.</param>
+        /// <returns>True, if the arguments are valid.</returns>
         private bool ValidateArguments(string[] args)
         {
             string helpMessage = 
@@ -130,7 +225,7 @@ namespace Synchronizer.PresentationLogic
 
             try
             {
-                validArguments = CheckArguments(args);
+                validArguments = this.CheckArguments(args);
             }
             catch (Exception exception)
             {
@@ -150,6 +245,11 @@ namespace Synchronizer.PresentationLogic
             return true;
         }
 
+        /// <summary>
+        /// Checks the arguments.
+        /// </summary>
+        /// <param name="args">The arguments.</param>
+        /// <returns>True if the arguments were successfully checked.</returns>
         private bool CheckArguments(string[] args)
         {
             // If first argument is help
@@ -163,6 +263,7 @@ namespace Synchronizer.PresentationLogic
                 Console.WriteLine("Error, must contain 6 parameters with given values");
                 return false;
             }
+
             if (args[0] != "-s" ||
                 args[2] != "-l" ||
                 args[4] != "-ls" ||
@@ -261,7 +362,6 @@ namespace Synchronizer.PresentationLogic
                             return false;
                         }
 
-
                         bool recursive;
                         if (!bool.TryParse(sourceElements[1], out recursive))
                         {
@@ -276,7 +376,6 @@ namespace Synchronizer.PresentationLogic
                             Console.WriteLine("Error, couldn't create source {0} because: \r\n{1}", sourceSection, errorMessage);
                             return false;
                         }
-
                     }
                     else if (j == 2)
                     {
@@ -344,6 +443,11 @@ namespace Synchronizer.PresentationLogic
             return true;
         }
 
+        /// <summary>
+        /// Refreshes the jobs.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="args">The <see cref="EventArgs"/> instance containing the event data.</param>
         private void RefreshJobs(object sender, EventArgs args)
         {
             if (this.currentMenu == Menu.Jobs)
@@ -352,10 +456,13 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Starts the UI input recognition.
+        /// </summary>
         private void Start()
         {
             ConsoleKey pressedKey;
-            ChangeMenu(Menu.Sources);
+            this.ChangeMenu(Menu.Sources);
             bool quit = false;
 
             do
@@ -373,41 +480,43 @@ namespace Synchronizer.PresentationLogic
                 switch (pressedKey)
                 {
                     case ConsoleKey.A:
-                        switch (currentMenu)
+                        switch (this.currentMenu)
                         {
                             case Menu.Sources:
-                                AddSource();
+                                this.AddSource();
                                 break;
                             case Menu.Targets:
-                                AddTarget();
+                                this.AddTarget();
                                 break;
                             case Menu.Exceptions:
-                                AddException();
+                                this.AddException();
                                 break;
                         }
+
                         break;
                     case ConsoleKey.D:
-                        switch (currentMenu)
+                        switch (this.currentMenu)
                         {
                             case Menu.Sources:
-                                DeleteSource();
+                                this.DeleteSource();
                                 break;
                             case Menu.Targets:
-                                DeleteTarget();
+                                this.DeleteTarget();
                                 break;
                             case Menu.Exceptions:
-                                DeleteException();
+                                this.DeleteException();
                                 break;
                         }
+
                         break;
                     case ConsoleKey.Escape:
                         {
-                            quit = CanEscape();
+                            quit = this.CanEscape();
                             break;
                         }
                 }
-
-            } while (!quit);
+            }
+            while (!quit);
 
             ApplicationManager.SaveSettings();
 
@@ -425,6 +534,10 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Determines whether this instance can escape.
+        /// </summary>
+        /// <returns>True, if it can escape.</returns>
         private bool CanEscape()
         {
             if (JobManager.HasFinished())
@@ -450,13 +563,17 @@ namespace Synchronizer.PresentationLogic
                     {
                         Console.Write("Error. Input must be \"y\" or \"n\" ");
                     }
-
-                } while (!validAnswer);
+                }
+                while (!validAnswer);
 
                 return input == "y" ? true : false;
             }
         }
 
+        /// <summary>
+        /// Changes the menu.
+        /// </summary>
+        /// <param name="newMenu">The new menu.</param>
         private void ChangeMenu(Menu? newMenu = null)
         {
             if (newMenu != null)
@@ -496,21 +613,23 @@ namespace Synchronizer.PresentationLogic
 
             Console.WriteLine("ESC Exit");
 
-            if (currentMenu == Menu.Sources || currentMenu == Menu.Targets || currentMenu == Menu.Exceptions)
+            if (this.currentMenu == Menu.Sources || this.currentMenu == Menu.Targets || this.currentMenu == Menu.Exceptions)
             {
                 Console.WriteLine("A   Add");
                 Console.WriteLine("D   Delete");
             }
 
-            Console.WriteLine("Current Menu: {0} {1}",
+            Console.WriteLine(
+                "Current Menu: {0} {1}",
                 this.menus.First(p => p.Value.ToString() == this.currentMenu.ToString()).Key,
                 this.currentMenu.ToString());
 
-            if ((currentMenu == Menu.Targets || currentMenu == Menu.Exceptions) && this.currentSourceId.HasValue)
+            if ((this.currentMenu == Menu.Targets || this.currentMenu == Menu.Exceptions) && this.currentSourceId.HasValue)
             {
-                var currentSource = ApplicationManager.GetSources()[currentSourceId.Value];
-                Console.WriteLine("{0} for source {1} {2}",
-                    currentMenu.ToString(),
+                var currentSource = ApplicationManager.GetSources()[this.currentSourceId.Value];
+                Console.WriteLine(
+                    "{0} for source {1} {2}",
+                    this.currentMenu.ToString(),
                     this.currentSourceId,
                     currentSource);
             }
@@ -535,15 +654,21 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Prints the sources.
+        /// </summary>
         private void PrintSources()
         {
             var sources = ApplicationManager.GetSources();
-            PrintListWithIndex(sources);
+            this.PrintListWithIndex(sources);
         }
 
+        /// <summary>
+        /// Adds a source.
+        /// </summary>
         private void AddSource()
         {
-            if (AddPath(PathOperation.Source))
+            if (this.AddPath(PathOperation.Source))
             {
                 this.ChangeMenu();
             }
@@ -553,6 +678,9 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Deletes a source.
+        /// </summary>
         private void DeleteSource()
         {
             var sources = ApplicationManager.GetSources();
@@ -563,7 +691,7 @@ namespace Synchronizer.PresentationLogic
             else
             {
                 int id;
-                if (GetIdInputFromCollection(out id, sources, IdOperation.DeleteSource))
+                if (this.GetIdInputFromCollection(out id, sources, IdOperation.DeleteSource))
                 {
                     ApplicationManager.DeleteSource(id);
                     this.ChangeMenu(Menu.Sources);
@@ -575,6 +703,13 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Gets the identifier input from collection.
+        /// </summary>
+        /// <param name="id">The identifier.</param>
+        /// <param name="collection">The collection.</param>
+        /// <param name="operation">The operation.</param>
+        /// <returns>False if the user canceled the input.</returns>
         private bool GetIdInputFromCollection(out int id, List<string> collection, IdOperation operation)
         {
             bool isValid = false;
@@ -633,12 +768,16 @@ namespace Synchronizer.PresentationLogic
                 {
                     Console.WriteLine("Error. Enter a valid number between 0 and " + (collection.Count() - 1));
                 }
-
-            } while (!isValid);
+            }
+            while (!isValid);
 
             return true;
         }
 
+        /// <summary>
+        /// Changes to targets.
+        /// </summary>
+        /// <returns>True if a valid source id is given.</returns>
         private bool ChangeToTargets()
         {
             var sources = ApplicationManager.GetSources();
@@ -663,14 +802,20 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Prints the targets.
+        /// </summary>
         private void PrintTargets()
         {
             this.PrintListWithIndex(ApplicationManager.GetTargets(this.currentSourceId.Value));
         }
 
+        /// <summary>
+        /// Adds a target.
+        /// </summary>
         private void AddTarget()
         {
-            if (AddPath(PathOperation.Target))
+            if (this.AddPath(PathOperation.Target))
             {
                 this.ChangeMenu();
             }
@@ -680,6 +825,9 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Deletes a target.
+        /// </summary>
         private void DeleteTarget()
         {
             var targets = ApplicationManager.GetTargets(this.currentSourceId.Value);
@@ -691,7 +839,7 @@ namespace Synchronizer.PresentationLogic
             else
             {
                 int id;
-                if (GetIdInputFromCollection(out id, targets, IdOperation.DeleteTarget))
+                if (this.GetIdInputFromCollection(out id, targets, IdOperation.DeleteTarget))
                 {
                     ApplicationManager.DeleteTarget(this.currentSourceId.Value, id);
                     this.ChangeMenu();
@@ -703,6 +851,10 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Changes to exceptions.
+        /// </summary>
+        /// <returns>True if a valid source is given.</returns>
         private bool ChangeToExceptions()
         {
             var sources = ApplicationManager.GetSources();
@@ -727,14 +879,20 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Prints the exceptions.
+        /// </summary>
         private void PrintExceptions()
         {
             this.PrintListWithIndex(ApplicationManager.GetExceptions(this.currentSourceId.Value));
         }
 
+        /// <summary>
+        /// Adds an exception.
+        /// </summary>
         private void AddException()
         {
-            if (AddPath(PathOperation.Exception))
+            if (this.AddPath(PathOperation.Exception))
             {
                 this.ChangeMenu();
             }
@@ -744,6 +902,9 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Deletes an exception.
+        /// </summary>
         private void DeleteException()
         {
             var exceptions = ApplicationManager.GetExceptions(this.currentSourceId.Value);
@@ -755,7 +916,7 @@ namespace Synchronizer.PresentationLogic
             else
             {
                 int id;
-                if (GetIdInputFromCollection(out id, exceptions, IdOperation.DeleteException))
+                if (this.GetIdInputFromCollection(out id, exceptions, IdOperation.DeleteException))
                 {
                     this.ChangeMenu();
                 }
@@ -766,6 +927,9 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Prints the jobs.
+        /// </summary>
         private void PrintJobs()
         {
             var jobs = ApplicationManager.GetJobs();
@@ -775,6 +939,9 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Prints the settings.
+        /// </summary>
         private void PrintSettings()
         {
             string blockCompareMinFileSize = Convert.ToString(ApplicationManager.Settings.BlockCompareMinFileSize);
@@ -792,7 +959,7 @@ namespace Synchronizer.PresentationLogic
 
             // Get want to change value
             bool wantChange;
-            GetInput<bool>(ValidationMethods.YesNoTryParse, out wantChange, "Want to change? y/n ", "Invalid input. Must be \"n\" or \"y\"");
+            this.GetInput<bool>(ValidationMethods.YesNoTryParse, out wantChange, "Want to change? y/n ", "Invalid input. Must be \"n\" or \"y\"");
 
             if (wantChange)
             {
@@ -818,7 +985,7 @@ namespace Synchronizer.PresentationLogic
                     int.TryParse,
                     out newBlockCompareBlockSize,
                     string.Format("New block compare block size (empty to keep {0}): ", blockCompareBlockSize),
-                    string.Format("Error, value must be a number between 1 and {0}", Int32.MaxValue),
+                    string.Format("Error, value must be a number between 1 and {0}", int.MaxValue),
                     false,
                     true,
                     ValidationMethods.IsValidBlockSize))
@@ -857,8 +1024,6 @@ namespace Synchronizer.PresentationLogic
                 // Get logging file size
                 long newMaxLoggingFileSize;
 
-
-
                 if (this.GetInput(
                     long.TryParse,
                     out newMaxLoggingFileSize,
@@ -873,10 +1038,18 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
-        delegate bool TryParse<T>(string str, out T value);
-
-        delegate bool IsValid<T>(T value);
-
+        /// <summary>
+        /// Gets the input for a specific type.
+        /// </summary>
+        /// <typeparam name="T">The data type.</typeparam>
+        /// <param name="parseFunction">The parse function.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="inputMessage">The input message.</param>
+        /// <param name="errorMessage">The error message.</param>
+        /// <param name="exitAllowed">If set to <c>true</c> exit is allowed.</param>
+        /// <param name="emptyAllowed">If set to <c>true</c> empty is allowed.</param>
+        /// <param name="isValid">The is valid method.</param>
+        /// <returns>False if the user cancelled the input.</returns>
         private bool GetInput<T>(TryParse<T> parseFunction, out T value, string inputMessage, string errorMessage, bool exitAllowed = false, bool emptyAllowed = false, IsValid<T> isValid = null)
         {
             // http://stackoverflow.com/questions/10574504/how-to-use-t-tryparse-in-a-generic-method-while-t-is-either-double-or-int
@@ -908,12 +1081,16 @@ namespace Synchronizer.PresentationLogic
                 {
                     Console.WriteLine(errorMessage);
                 }
-
-            } while (!canParse);
+            }
+            while (!canParse);
 
             return true;
         }
 
+        /// <summary>
+        /// Prints a list with index values.
+        /// </summary>
+        /// <param name="values">The values.</param>
         private void PrintListWithIndex(List<string> values)
         {
             if (values == null || values.Count == 0)
@@ -929,6 +1106,11 @@ namespace Synchronizer.PresentationLogic
             }
         }
 
+        /// <summary>
+        /// Adds a path.
+        /// </summary>
+        /// <param name="operation">The operation.</param>
+        /// <returns>False if the path couldn't be added.</returns>
         private bool AddPath(PathOperation operation)
         {
             string information = string.Empty;
@@ -950,7 +1132,7 @@ namespace Synchronizer.PresentationLogic
 
             DirectoryInfo newDirectory;
 
-            IsValid<DirectoryInfo> isValid = delegate (DirectoryInfo value)
+            IsValid<DirectoryInfo> isValid = delegate(DirectoryInfo value)
             {
                 string errorMessage = string.Empty;
 
@@ -959,7 +1141,7 @@ namespace Synchronizer.PresentationLogic
                     case PathOperation.Source:
                         bool isRecursive;
 
-                        if (!GetInput(bool.TryParse, out isRecursive, "Is recursive: ", "Error, value must be \"true\" or \"false\""))
+                        if (!this.GetInput(bool.TryParse, out isRecursive, "Is recursive: ", "Error, value must be \"true\" or \"false\""))
                         {
                             return false;
                         }

@@ -1,15 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-
+﻿//-----------------------------------------------------------------------
+// <copyright file="AttributeManager.cs" company="Lukas Handler">
+//     Lukas Handler
+// </copyright>
+// <summary>
+// This file contains the copy attributes mechanism.
+// </summary>
+//-----------------------------------------------------------------------
 namespace Synchronizer.ApplicationLogic
 {
-    public static class AttributeManager
+    using System;
+    using System.IO;
+
+    /// <summary>
+    /// This class contains the copy attributes mechanism.
+    /// </summary>
+    internal static class AttributeManager
     {
+        /// <summary>
+        /// Copies the attributes.
+        /// </summary>
+        /// <param name="source">The source.</param>
+        /// <param name="target">The target.</param>
+        /// <param name="isDirectory">If set to <c>true</c> it is a directory.</param>
         public static void CopyAttributes(FileSystemInfo source, FileSystemInfo target, bool isDirectory)
         {
             // If file or directory doesn't exist, don't change attributes
@@ -48,26 +60,6 @@ namespace Synchronizer.ApplicationLogic
                 target.LastWriteTimeUtc = source.LastWriteTimeUtc;
                 target.LastAccessTime = source.LastAccessTime;
                 target.LastAccessTimeUtc = source.LastAccessTimeUtc;
-            }
-
-            SameAttributes(source, target);
-        }
-
-        public static bool SameAttributes(FileSystemInfo source, FileSystemInfo target)
-        {
-            if (target.Attributes != source.Attributes ||
-                target.CreationTime != source.CreationTime ||
-                target.CreationTimeUtc != source.CreationTimeUtc ||
-                target.LastWriteTime != source.LastWriteTime ||
-                target.LastWriteTimeUtc != source.LastWriteTimeUtc ||
-                target.LastAccessTime != source.LastAccessTime ||
-                target.LastAccessTimeUtc != source.LastAccessTimeUtc)
-            {
-                throw new NotImplementedException();
-            }
-            else
-            {
-                return true;
             }
         }
     }

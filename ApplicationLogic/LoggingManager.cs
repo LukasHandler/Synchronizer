@@ -1,23 +1,41 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿//-----------------------------------------------------------------------
+// <copyright file="LoggingManager.cs" company="Lukas Handler">
+//     Lukas Handler
+// </copyright>
+// <summary>
+// This file represents the logging manager.
+// </summary>
+//-----------------------------------------------------------------------
 namespace Synchronizer.ApplicationLogic
 {
+    using System;
+    using System.IO;
+    using System.Net;
+    using System.Net.Sockets;
+    using System.Text;
+
+    /// <summary>
+    /// This class represents the manager responsible for logging.
+    /// </summary>
     public static class LoggingManager
     {
+        /// <summary>
+        /// A locker for thread save log message write operations.
+        /// </summary>
         private static object locker;
 
+        /// <summary>
+        /// Initializes static members of the <see cref="LoggingManager"/> class.
+        /// </summary>
         static LoggingManager()
         {
             locker = new object();
         }
 
+        /// <summary>
+        /// Logs the specified message.
+        /// </summary>
+        /// <param name="message">The message.</param>
         public static void Log(string message)
         {
             string log = DateTime.Now.ToString("dd.MM.yyyy-HH:mm:ss:FF") + " " + message;
@@ -25,6 +43,10 @@ namespace Synchronizer.ApplicationLogic
             WriteLogFile(log);
         }
 
+        /// <summary>
+        /// Writes the log message in the log file.
+        /// </summary>
+        /// <param name="logMessage">The log message.</param>
         private static void WriteLogFile(string logMessage)
         {
             try
@@ -64,10 +86,13 @@ namespace Synchronizer.ApplicationLogic
             }
             catch (Exception)
             {
-                return;
             }
         }
 
+        /// <summary>
+        /// Sends the log message to the logging project.
+        /// </summary>
+        /// <param name="logMessage">The log message.</param>
         private static void SendLogMessage(string logMessage)
         {
             try
@@ -78,7 +103,6 @@ namespace Synchronizer.ApplicationLogic
             }
             catch (Exception)
             {
-
             }
         }
     }

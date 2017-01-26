@@ -49,7 +49,9 @@
     <Compile Include="BlockComparer.cs" />
     <Compile Include="Job.cs" />
     <Compile Include="JobEntry.cs" />
-    <Compile Include="JobManager.cs" />
+    <Compile Include="JobManager.cs">
+      <ExcludeFromStyleCop>False</ExcludeFromStyleCop>
+    </Compile>
     <Compile Include="LoggingManager.cs" />
     <Compile Include="PathHelper.cs" />
     <Compile Include="Serializer.cs" />

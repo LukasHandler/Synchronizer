@@ -1,4 +1,13 @@
-﻿using System.Reflection;
+﻿//-----------------------------------------------------------------------
+// <copyright file="AssemblyInfo.cs" company="Lukas Handler">
+//     Lukas Handler
+// </copyright>
+// <summary>
+// Auto generated file.
+// </summary>
+//-----------------------------------------------------------------------
+
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 

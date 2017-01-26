@@ -1,14 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿//-----------------------------------------------------------------------
+// <copyright file="PathHelper.cs" company="Lukas Handler">
+//     Lukas Handler
+// </copyright>
+// <summary>
+// This file contains path helping methods.
+// </summary>
+//-----------------------------------------------------------------------
 namespace Synchronizer.ApplicationLogic
 {
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Linq;
+
+    /// <summary>
+    /// This class contains path helping methods.
+    /// </summary>
     public static class PathHelper
     {
+        /// <summary>
+        /// Determines whether two file system info are the same path.
+        /// </summary>
+        /// <param name="path1">The path1.</param>
+        /// <param name="path2">The path2.</param>
+        /// <returns>True if they have the same path.</returns>
         public static bool IsSamePath(FileSystemInfo path1, FileSystemInfo path2)
         {
             if (path1.FullName.ToLower().TrimEnd('\\') == path2.FullName.ToLower().TrimEnd('\\'))
@@ -21,6 +35,12 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
+        /// <summary>
+        /// Changes the path to default path.
+        /// </summary>
+        /// <param name="path">The path which should be changed.</param>
+        /// <param name="isFile">If set to <c>true</c> it is a file.</param>
+        /// <returns>The new file path with default path layout.</returns>
         public static string ChangePathToDefaultPath(string path, bool isFile = false)
         {
             string newPath = path.Replace('/', '\\').Trim().TrimEnd('\\').ToLower();
@@ -43,6 +63,11 @@ namespace Synchronizer.ApplicationLogic
             return newPath;
         }
 
+        /// <summary>
+        /// Gets the name of the logical drive.
+        /// </summary>
+        /// <param name="path">The path including the logical drive.</param>
+        /// <returns>The logical drive.</returns>
         public static string GetLogicalDriveName(string path)
         {
             string defaultPath = ChangePathToDefaultPath(path);
@@ -57,6 +82,11 @@ namespace Synchronizer.ApplicationLogic
             }
         }
 
+        /// <summary>
+        /// Determines whether this instance can synchronize the specified targets.
+        /// </summary>
+        /// <param name="targets">The targets.</param>
+        /// <returns>True if it can synchronize.</returns>
         public static bool CanSynchronize(List<DirectoryInfo> targets)
         {
             List<string> pathes = targets.Select(p => p.FullName).ToList();
@@ -99,7 +129,11 @@ namespace Synchronizer.ApplicationLogic
             return true;
         }
 
-        // Validate whole structure.
+        /// <summary>
+        /// Validates the whole structure.
+        /// </summary>
+        /// <param name="sourceDirectories">The source directories to validate.</param>
+        /// <returns>A possible error message if the structure is invalid.</returns>
         public static string IsValid(List<SourceFileDirectory> sourceDirectories)
         {
             // Validate all pathes and change the layout.
@@ -145,7 +179,6 @@ namespace Synchronizer.ApplicationLogic
                         exception = new DirectoryInfo(ChangePathToDefaultPath(exception.FullName));
                     }
                 }
-
             }
 
             // Validate each source
@@ -219,6 +252,12 @@ namespace Synchronizer.ApplicationLogic
             return null;
         }
 
+        /// <summary>
+        /// Determines whether a file system info is in a sub directory of another file system info.
+        /// </summary>
+        /// <param name="subDirectory">The sub directory.</param>
+        /// <param name="path">The path of the parent.</param>
+        /// <returns>True if it is a sub directory.</returns>
         public static bool IsSubDirectoryOfPath(FileSystemInfo subDirectory, FileSystemInfo path)
         {
             if (IsSamePath(subDirectory, path) || subDirectory.FullName.Count() <= path.FullName.Count())
